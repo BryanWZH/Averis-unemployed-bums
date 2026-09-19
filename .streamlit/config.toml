@@ -1,2 +1,20 @@
 [server]
 maxUploadSize = 5
+
+# Two hand-tuned palettes. Streamlit follows the visitor's device setting and they can switch
+# in the menu. Light is warm cream paper with deep teal; dark is deep navy with glowing teal.
+[theme.light]
+primaryColor = "#0F766E"
+backgroundColor = "#FAF3E8"
+secondaryBackgroundColor = "#F1E6D2"
+textColor = "#2E2417"
+borderColor = "#E3D3B8"
+baseRadius = "large"
+
+[theme.dark]
+primaryColor = "#2DD4BF"
+backgroundColor = "#0A1120"
+secondaryBackgroundColor = "#111B30"
+textColor = "#E7EDF6"
+borderColor = "#22314F"
+baseRadius = "large"

@@ -29,7 +29,7 @@ def _refresh_local_modules():
     sig = tuple((f.name, f.stat().st_mtime_ns) for f in sorted(here.glob("*.py")))
     if getattr(sys, "_sdoc_sig", None) != sig:
         for name in ("loader", "normalize", "extract", "classify", "ai_extract", "ai_reply",
-                     "pipeline", "report", "samples", "dashboard"):
+                     "pipeline", "report", "samples", "style", "dashboard"):
             if name in sys.modules:
                 importlib.reload(sys.modules[name])
         sys._sdoc_sig = sig
@@ -45,46 +45,17 @@ import extract
 import pipeline
 import report
 import samples
+import style
 from loader import Inbox
 from normalize import COMPARE_FIELDS
 
 DATA_DIR = Path(__file__).parent
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
-STATUS_STYLE = {
-    "OK": ("#1e8e5a", "#e3f4ea", "OK"),
-    "MISMATCH": ("#c0392b", "#fbe7e4", "MISMATCH"),
-    "NEEDS_REVIEW": ("#b9770e", "#fdf1dc", "NEEDS REVIEW"),
-}
+STATUS_LABEL = {"OK": "OK", "MISMATCH": "MISMATCH", "NEEDS_REVIEW": "NEEDS REVIEW"}
 
 st.set_page_config(page_title="SDOC Verification", page_icon="🚢", layout="wide")
-st.markdown("""
-<style>
-.block-container {padding-top: 2rem; max-width: 1200px;}
-.sdoc-badge {display:inline-block; padding:.35rem .9rem; border-radius:999px; font-weight:700;
-             font-size:1.05rem; letter-spacing:.02em;}
-.sdoc-diff {font-family: ui-monospace, Menlo, Consolas, monospace; font-size:.95rem;}
-.sd-tblwrap {overflow-x:auto; margin:.4rem 0 1rem;}
-.sd-tbl, .sd-kv {width:100%; border-collapse:separate; border-spacing:0;
-                 border:1px solid rgba(128,128,128,.28); border-radius:12px; overflow:hidden;}
-.sd-tbl th {text-align:left; padding:.6rem .9rem; font-size:.76rem; text-transform:uppercase;
-            letter-spacing:.06em; opacity:.75; background:rgba(128,128,128,.14);}
-.sd-tbl td, .sd-kv td {padding:.65rem .9rem; border-top:1px solid rgba(128,128,128,.18);
-                       vertical-align:top; word-break:break-word;}
-.sd-tbl tbody tr:first-child td, .sd-kv tbody tr:first-child td {border-top:none;}
-.sd-tbl td.f {font-weight:700; white-space:nowrap;}
-.sd-tbl td.v {font-family: ui-monospace, Menlo, Consolas, monospace; font-size:.9rem;}
-.sd-tbl tr.bad td {background:rgba(208,59,59,.11);}
-.sd-tbl tr.bad td.f {box-shadow: inset 4px 0 0 #d03b3b;}
-.sd-tbl tr.warn td {background:rgba(250,178,25,.13);}
-.sd-tbl tr.warn td.f {box-shadow: inset 4px 0 0 #fab219;}
-.sd-pill {display:inline-block; padding:.15rem .65rem; border-radius:999px; font-weight:700;
-          font-size:.82rem; white-space:nowrap;}
-.sd-pill.ok {background:rgba(30,142,90,.20);}
-.sd-pill.bad {background:rgba(208,59,59,.22);}
-.sd-pill.warn {background:rgba(250,178,25,.28);}
-.sd-kv td.k {width:9.5rem; font-weight:700; opacity:.8; background:rgba(128,128,128,.10); white-space:nowrap;}
-</style>
-""", unsafe_allow_html=True)
+DARK = style.is_dark()
+st.markdown(style.css(DARK), unsafe_allow_html=True)
 
 
 def _secret(name):
@@ -96,10 +67,6 @@ def _secret(name):
             value = None
     return (value or "").strip()
 
-
-st.title("🚢 SDOC: Shipping Document Verification")
-st.caption("Reads every email in a shipping-ops inbox, compares each Shipping Instruction (SI) "
-           "with its draft Bill of Lading (BL) across 7 fields, and hands anything uncertain to a human.")
 
 # AI reading spends API credit, and this page is public. It stays OFF for
 # everyone unless AI_ACCESS_CODE is configured AND the visitor enters it.
@@ -127,6 +94,8 @@ st.sidebar.markdown("---")
 st.sidebar.caption("**How it decides.** Documents are read (by AI or rules), then plain, auditable "
                    "code compares the fields. A model never gets to talk itself out of a discrepancy.")
 
+st.markdown(style.hero("AI reader on" if use_ai else "Rule-based reader", use_ai), unsafe_allow_html=True)
+
 
 @st.cache_data(show_spinner="Analysing the whole inbox...")
 def load_analysis():
@@ -134,7 +103,8 @@ def load_analysis():
 
 
 def badge(status):
-    fg, bg, label = STATUS_STYLE.get(status, ("#555", "#eee", status))
+    fg, bg = style.STATUS["dark" if DARK else "light"].get(status, ("#777", "rgba(128,128,128,.15)"))
+    label = STATUS_LABEL.get(status, status)
     st.markdown(f"<span class='sdoc-badge' style='color:{fg};background:{bg}'>{label}</span>",
                 unsafe_allow_html=True)
 
@@ -477,12 +447,12 @@ with tab_compare:
             if len(pairs) > 50:
                 st.info("Showing the first 50 pairs.")
             if results:
-                counts = {k: sum(r["status"] == k for _, r, _ in results) for k in STATUS_STYLE}
+                counts = {k: sum(r["status"] == k for _, r, _ in results) for k in STATUS_LABEL}
                 m1, m2, m3 = st.columns(3)
                 m1.metric("OK", counts["OK"])
                 m2.metric("Mismatch", counts["MISMATCH"])
                 m3.metric("Needs review", counts["NEEDS_REVIEW"])
-                table = [{"Pair": k, "Verdict": STATUS_STYLE[r["status"]][2],
+                table = [{"Pair": k, "Verdict": STATUS_LABEL[r["status"]],
                           "Details": (", ".join(report.FIELD_NAMES[f] for f in r["defect_fields"])
                                       if r["status"] == "MISMATCH"
                                       else report.REASONS.get(r["review_reason"], "") if r["status"] == "NEEDS_REVIEW"
@@ -583,7 +553,7 @@ with tab_inbox:
         email = Inbox(str(DATA_DIR)).get(pick["email_id"])
         pairs = [("From", email.get("from", "")), ("Category", pick["category"].replace("_", " ").title())]
         if pick["category"] == "BL_COMPARISON":       # other emails have no verdict to show
-            pairs.append(("Verdict", STATUS_STYLE[pick["status"]][2].title() if pick["status"] != "OK" else "OK"))
+            pairs.append(("Verdict", STATUS_LABEL[pick["status"]].title() if pick["status"] != "OK" else "OK"))
         st.markdown(report.kv_html(pairs), unsafe_allow_html=True)
         st.text_area("Body", email.get("body", ""), height=180, disabled=True,
                      key=f"body_{pick['email_id']}")

@@ -35,26 +35,6 @@ REASON_LABEL = {
     "missing_value": ("✏️", "Blank field"),
 }
 
-CSS = """
-<style>
-.sd-tile {border-radius:14px; padding:1rem 1.2rem; background:rgba(128,128,128,.10);
-          border-top:4px solid var(--accent); height:100%;}
-.sd-tile .v {font-size:2.5rem; font-weight:800; line-height:1.1;}
-.sd-tile .l {font-size:.9rem; opacity:.75; margin-top:.15rem;}
-.sd-card {border-radius:14px; padding:1rem 1.2rem .4rem; background:rgba(128,128,128,.07);
-          margin-bottom:.9rem;}
-.sd-card .ttl {margin:0 0 .1rem; font-size:1.1rem; font-weight:700;}
-.sd-card .sub {font-size:.85rem; opacity:.7; margin-bottom:.4rem;}
-.sd-leg {display:flex; align-items:center; gap:.55rem; padding:.28rem 0;}
-.sd-dot {width:.8rem; height:.8rem; border-radius:50%; flex:none;}
-.sd-leg .n {margin-left:auto; font-weight:700; font-variant-numeric:tabular-nums;}
-.sd-leg .p {opacity:.6; width:3.2rem; text-align:right; font-variant-numeric:tabular-nums;}
-.sd-hero {font-size:3rem; font-weight:800; line-height:1;}
-.sd-mini {border-radius:12px; padding:.8rem 1rem; background:rgba(128,128,128,.10); text-align:center;}
-.sd-mini .v {font-size:1.9rem; font-weight:800;}
-.sd-mini .l {font-size:.85rem; opacity:.8;}
-</style>
-"""
 
 
 def _is_dark():
@@ -70,7 +50,7 @@ def _tile(value, label, accent):
 
 
 def _card_open(title, subtitle):
-    st.markdown(f"<div class='sd-card'><div class='ttl'>{title}</div><div class='sub'>{subtitle}</div></div>",
+    st.markdown(f"<div class='sd-cardhead'><div class='ttl'>{title}</div><div class='sub'>{subtitle}</div></div>",
                 unsafe_allow_html=True)
 
 
@@ -117,7 +97,6 @@ def _hbars(df, height, colors=None):
 
 def render(rows_all):
     dark = _is_dark()
-    st.markdown(CSS, unsafe_allow_html=True)
     s = report.summarize(rows_all)
     status = s["status"]
     comp = [r for r in rows_all if r["category"] == "BL_COMPARISON"]
@@ -134,12 +113,12 @@ def render(rows_all):
                   unsafe_allow_html=True)
     k[2].markdown(_tile(status.get("MISMATCH", 0), "Mismatches caught", STATUS_STYLE["MISMATCH"][2]),
                   unsafe_allow_html=True)
-    k[3].markdown(_tile(status.get("NEEDS_REVIEW", 0), "Sent to a human, not guessed",
+    k[3].markdown(_tile(status.get("NEEDS_REVIEW", 0), "Escalated to a human",
                         STATUS_STYLE["NEEDS_REVIEW"][2]), unsafe_allow_html=True)
     st.write("")
 
     # ---- row 1: outcome donut + pipeline funnel ---------------------------
-    a, b = st.columns([1.05, 1])
+    a, b = st.columns([1.05, 1], border=True)
     with a:
         _card_open("How the comparisons ended", "Every SI vs draft BL check, by verdict")
         items = [(STATUS_STYLE[k_][1], v, STATUS_STYLE[k_][2], STATUS_STYLE[k_][0])
@@ -168,7 +147,7 @@ def render(rows_all):
         st.altair_chart(chart, width="stretch")
 
     # ---- row 2: inbox mix donut + defect fields ---------------------------
-    c, d = st.columns([1.05, 1])
+    c, d = st.columns([1.05, 1], border=True)
     with c:
         _card_open("What is in the inbox", "Every email, sorted into 5 categories")
         cats = s["categories"]
@@ -193,31 +172,35 @@ def render(rows_all):
             st.info("No defects found.")
 
     # ---- row 3: why humans were needed ------------------------------------
-    _card_open("Why documents went to a human",
-               "The system never guesses: anything it cannot read or verify is escalated with a reason")
-    reasons = s["review_reasons"]
-    cols = st.columns(4)
-    for col, (key, (icon, label)) in zip(cols, REASON_LABEL.items()):
-        col.markdown(f"<div class='sd-mini'><div class='v'>{icon} {reasons.get(key, 0)}</div>"
-                     f"<div class='l'>{label}</div></div>", unsafe_allow_html=True)
-    st.write("")
+    with st.container(border=True):
+        _card_open("Why documents went to a human",
+                   "The system never guesses: anything it cannot read or verify is escalated with a reason")
+        reasons = s["review_reasons"]
+        cols = st.columns(4)
+        for col, (key, (icon, label)) in zip(cols, REASON_LABEL.items()):
+            col.markdown(f"<div class='sd-mini'><div class='v'>{icon} {reasons.get(key, 0)}</div>"
+                         f"<div class='l'>{label}</div></div>", unsafe_allow_html=True)
+        st.write("")
 
     # ---- what this saves ---------------------------------------------------
-    _card_open("What this saves", "An estimate: move the sliders to match how long your team really takes")
-    v1, v2 = st.columns([1.2, 1])
-    with v1:
-        m_check = st.slider("Minutes to check one SI against its BL by hand", 1, 20, 5, key="vs_check")
-        m_reply = st.slider("Minutes to write the reply to the sender", 0, 10, 2, key="vs_reply")
-    saved = report.time_saved(rows_all, m_check, m_reply)
-    with v2:
-        st.markdown(f"<div class='sd-hero'>{saved['hours']:.1f} hours</div>"
-                    f"<div style='opacity:.8;margin:.3rem 0 .5rem'>of manual work handled automatically</div>"
-                    f"<div style='opacity:.75;font-size:.9rem'>{saved['checks']} SI vs BL checks decided and "
-                    f"answered on their own. The other {saved['escalated']} cases still go to a person, and "
-                    f"are not counted as saved.</div>", unsafe_allow_html=True)
-    st.caption("Estimate based on the assumptions above, not a measurement.")
-    st.write("")
+    with st.container(border=True):
+        _card_open("What this saves", "An estimate: move the sliders to match how long your team really takes")
+        v1, v2 = st.columns([1.2, 1])
+        with v1:
+            m_check = st.slider("Minutes to check one SI against its BL by hand", 1, 20, 5, key="vs_check")
+            m_reply = st.slider("Minutes to write the reply to the sender", 0, 10, 2, key="vs_reply")
+        saved = report.time_saved(rows_all, m_check, m_reply)
+        with v2:
+            st.markdown(f"<div class='sd-hero'>{saved['hours']:.1f} hours</div>"
+                        f"<div style='opacity:.8;margin:.3rem 0 .5rem'>of manual work handled automatically</div>"
+                        f"<div style='opacity:.75;font-size:.9rem'>{saved['checks']} SI vs BL checks decided and "
+                        f"answered on their own. The other {saved['escalated']} cases still go to a person, and "
+                        f"are not counted as saved.</div>", unsafe_allow_html=True)
+        st.caption("Estimate based on the assumptions above, not a measurement.")
+        st.write("")
 
     d1, d2, _ = st.columns([1, 1, 3])
-    d1.download_button("⬇️ Results (CSV)", report.to_csv(rows_all), "sdoc_results.csv")
-    d2.download_button("⬇️ submission.json", report.to_submission_json(rows_all), "submission.json")
+    d1.download_button("⬇️ Results (CSV)", report.to_csv(rows_all), "sdoc_results.csv",
+                    help="A spreadsheet of every email: category, verdict, reason and differing fields. Opens in Excel.")
+    d2.download_button("⬇️ submission.json", report.to_submission_json(rows_all), "submission.json",
+                    help="The same results in the exact format the hackathon scorer reads.")
