@@ -103,7 +103,7 @@ def show_case(key, title, subject, sender, result, rows):
         st.markdown("All 7 fields match.")
 
     if rows:
-        st.markdown("##### Field by field")
+        st.markdown("**Field by field**")
         h = st.columns([1.3, 3, 3, 0.9])
         for c, t in zip(h, ("Field", "Shipping Instruction", "Draft BL", "Result")):
             c.markdown(f"<span style='color:#6b7280;font-size:.85rem'>{t}</span>", unsafe_allow_html=True)

@@ -43,7 +43,7 @@ CSS = """
 .sd-tile .l {font-size:.9rem; opacity:.75; margin-top:.15rem;}
 .sd-card {border-radius:14px; padding:1rem 1.2rem .4rem; background:rgba(128,128,128,.07);
           margin-bottom:.9rem;}
-.sd-card h5 {margin:0 0 .1rem; font-size:1.05rem;}
+.sd-card .ttl {margin:0 0 .1rem; font-size:1.1rem; font-weight:700;}
 .sd-card .sub {font-size:.85rem; opacity:.7; margin-bottom:.4rem;}
 .sd-leg {display:flex; align-items:center; gap:.55rem; padding:.28rem 0;}
 .sd-dot {width:.8rem; height:.8rem; border-radius:50%; flex:none;}
@@ -70,7 +70,7 @@ def _tile(value, label, accent):
 
 
 def _card_open(title, subtitle):
-    st.markdown(f"<div class='sd-card'><h5>{title}</h5><div class='sub'>{subtitle}</div></div>",
+    st.markdown(f"<div class='sd-card'><div class='ttl'>{title}</div><div class='sub'>{subtitle}</div></div>",
                 unsafe_allow_html=True)
 
 
