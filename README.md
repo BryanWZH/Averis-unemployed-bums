@@ -16,7 +16,9 @@ tell confidently.
 | `normalize.py` | Shared field-label matching ("Load Port" = "Port of Loading") and value cleanup |
 | `loader.py` | Reads the inbox/attachments from disk (or an HTTP server) |
 | `inbox/`, `attachments/` | The test dataset |
-| `app.py` | Browser demo (Streamlit): upload an SI + BL, or browse the sample inbox |
+| `app.py` | Web app (Streamlit): inbox dashboard, review queue, document comparison with a visual diff, draft replies |
+| `report.py` | Diffs, draft-reply emails, downloadable reports and inbox analytics used by the app |
+| `tests/` | Regression tests (`python tests/test_normalize.py`, `python tests/test_report.py`) |
 | `score_cli.py` | Scores a `submission.json` against a ground-truth file |
 | `packages.txt` | System packages (Tesseract, Poppler) installed on Streamlit Cloud |
 | `docs/` | Project description, slide outline and demo-video script |

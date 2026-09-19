@@ -1,0 +1,163 @@
+"""Presentation helpers for the web app: whole-inbox analysis, character-level
+diffs, draft reply emails and downloadable reports. Pure functions, no
+Streamlit and no AI, so they are cheap and unit-testable.
+"""
+import csv
+import difflib
+import html
+import io
+import json
+import re
+
+import classify
+import pipeline
+from loader import Inbox
+from normalize import COMPARE_FIELDS, is_blank_value, normalize_value
+
+FIELD_NAMES = {
+    "shipper": "Shipper", "consignee": "Consignee", "notify_party": "Notify party",
+    "port_of_loading": "Port of loading", "port_of_discharge": "Port of discharge",
+    "container_count": "Container count", "gross_weight_kg": "Gross weight (kg)",
+}
+REASONS = {
+    "missing_attachment": "An SI/BL attachment is missing.",
+    "unreadable": "A document could not be read (empty, corrupt or an image-only scan).",
+    "wrong_doc_type": "A document is not an SI or BL (for example an invoice or packing list).",
+    "missing_value": "A field is blank or a placeholder, so it can't be compared.",
+}
+NEXT_STEP = {
+    "missing_attachment": "Ask the sender to resend both the SI and the draft BL.",
+    "unreadable": "Ask for a text-based copy (not a scan) or check the documents manually.",
+    "wrong_doc_type": "Ask the sender for the correct SI and draft BL.",
+    "missing_value": "Ask the sender to fill in the blank field, then re-check.",
+}
+
+
+# ---------------------------------------------------------------- comparison
+def field_rows(si_res, bl_res):
+    """One row per compared field: raw values, verdict and normalised values."""
+    rows = []
+    for f in COMPARE_FIELDS:
+        sv, bv = si_res.fields.get(f), bl_res.fields.get(f)
+        if is_blank_value(sv) or is_blank_value(bv):
+            verdict = "blank"
+        else:
+            verdict = "match" if normalize_value(f, sv) == normalize_value(f, bv) else "mismatch"
+        rows.append({"field": f, "label": FIELD_NAMES[f], "si": sv or "", "bl": bv or "",
+                     "verdict": verdict})
+    return rows
+
+
+def diff_html(a, b):
+    """Two HTML snippets (for the SI value and the BL value) with the
+    characters that differ highlighted."""
+    a, b = a or "", b or ""
+    sm = difflib.SequenceMatcher(None, a, b, autojunk=False)
+    left, right = [], []
+    for op, i1, i2, j1, j2 in sm.get_opcodes():
+        seg_a, seg_b = html.escape(a[i1:i2]), html.escape(b[j1:j2])
+        if op == "equal":
+            left.append(seg_a)
+            right.append(seg_b)
+        else:
+            if seg_a:
+                left.append(f"<mark style='background:#f5b7b1;color:#7b241c;border-radius:3px'>{seg_a}</mark>")
+            if seg_b:
+                right.append(f"<mark style='background:#f5b7b1;color:#7b241c;border-radius:3px'>{seg_b}</mark>")
+    return "".join(left), "".join(right)
+
+
+def draft_reply(subject, result, rows, sender_name=None):
+    """A ready-to-send reply to the sender describing what was found."""
+    greeting = f"Hi {sender_name}," if sender_name else "Hi,"
+    base = re.sub(r"^(re|fw|fwd)[:_]\s*", "", subject.strip(), flags=re.I)
+    subj = f"RE: {base}"
+    lines = [greeting, ""]
+    status = result["status"]
+    if status == "OK":
+        lines += ["We have compared the Shipping Instruction against the draft Bill of Lading",
+                  "and all checked fields match (shipper, consignee, notify party, ports,",
+                  "container count and gross weight). The draft BL is in order.", ""]
+    elif status == "MISMATCH":
+        bad = [r for r in rows if r["verdict"] == "mismatch"]
+        lines += ["We compared the Shipping Instruction against the draft Bill of Lading and",
+                  f"found {len(bad)} discrepanc{'y' if len(bad) == 1 else 'ies'} that need correcting:", ""]
+        for r in bad:
+            lines += [f"  - {r['label']}", f"      SI : {r['si']}", f"      BL : {r['bl']}"]
+        lines += ["", "Please confirm the correct details so we can amend the draft BL.", ""]
+    else:
+        reason = result.get("review_reason")
+        lines += ["We could not complete the comparison of the Shipping Instruction and draft BL:",
+                  f"  {REASONS.get(reason, 'The documents need a manual check.')}", "",
+                  NEXT_STEP.get(reason, "Please resend the documents."), ""]
+    lines += ["Best regards,", "Shipping Documentation"]
+    return subj, "\n".join(lines)
+
+
+def report_markdown(title, result, rows):
+    out = [f"# SDOC verification report", "", f"**Case:** {title}", f"**Verdict:** {result['status']}"]
+    if result.get("review_reason"):
+        out.append(f"**Reason:** {REASONS.get(result['review_reason'], result['review_reason'])}")
+    out += ["", "| Field | SI | BL | Result |", "|---|---|---|---|"]
+    for r in rows:
+        out.append(f"| {r['label']} | {r['si']} | {r['bl']} | {r['verdict']} |")
+    return "\n".join(out) + "\n"
+
+
+# --------------------------------------------------------------- whole inbox
+def analyze_inbox(data_dir, use_ai=False):
+    """Run the full pipeline over every email and return one detail row each.
+    Same decisions as pipeline.run(), plus the extracted values."""
+    inbox = Inbox(str(data_dir))
+    out = []
+    for email in inbox:
+        atts = email.get("attachments", []) or []
+        category, _ = classify.classify(email, has_attachments=bool(atts))
+        row = {"email_id": email["email_id"], "subject": email.get("subject", ""),
+               "from": email.get("from", ""), "category": category,
+               "status": "OK", "review_reason": None, "defect_fields": [], "rows": []}
+        if category == "BL_COMPARISON":
+            si_path, bl_path = pipeline._pick_si_bl(atts) if len(atts) >= 2 else (None, None)
+            if si_path and bl_path:
+                result, si_res, bl_res = pipeline.compare_documents(
+                    inbox.read_bytes(si_path), si_path, inbox.read_bytes(bl_path), bl_path,
+                    use_ai=use_ai)
+                row["rows"] = field_rows(si_res, bl_res)
+            else:
+                result = pipeline.decide_comparison(email, inbox)
+            row.update(status=result["status"], review_reason=result["review_reason"],
+                       defect_fields=result["defect_fields"])
+        out.append(row)
+    return out
+
+
+def summarize(rows):
+    cats, status, reasons, fields = {}, {}, {}, {}
+    for r in rows:
+        cats[r["category"]] = cats.get(r["category"], 0) + 1
+        status[r["status"]] = status.get(r["status"], 0) + 1
+        if r["review_reason"]:
+            reasons[r["review_reason"]] = reasons.get(r["review_reason"], 0) + 1
+        for f in r["defect_fields"]:
+            fields[f] = fields.get(f, 0) + 1
+    compared = sum(1 for r in rows if r["category"] == "BL_COMPARISON")
+    return {"total": len(rows), "compared": compared, "categories": cats, "status": status,
+            "review_reasons": reasons, "defect_fields": fields}
+
+
+def to_csv(rows):
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["email_id", "category", "status", "review_reason", "defect_fields", "subject"])
+    for r in rows:
+        w.writerow([r["email_id"], r["category"], r["status"], r["review_reason"] or "",
+                    ";".join(r["defect_fields"]), r["subject"]])
+    return buf.getvalue()
+
+
+def to_submission_json(rows):
+    """The exact shape the hackathon scorer expects."""
+    return json.dumps({r["email_id"]: {
+        "category": r["category"], "status": r["status"],
+        "review_reason": r["review_reason"], "has_defect": r["status"] == "MISMATCH",
+        "defect_fields": r["defect_fields"]} for r in rows}, indent=2)
