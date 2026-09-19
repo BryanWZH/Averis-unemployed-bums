@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 # On Streamlit Community Cloud the key lives in "Secrets", not the environment.
 try:
@@ -74,6 +75,8 @@ access_code = _secret("AI_ACCESS_CODE")
 ai_ready = ai_extract.available() and bool(access_code)
 use_ai = False
 cross_check = False
+with st.sidebar:
+    components.html(style.theme_switch_html(DARK), height=42)
 st.sidebar.header("Reader")
 if ai_ready:
     entered = st.sidebar.text_input("AI access code", type="password",

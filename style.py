@@ -164,3 +164,19 @@ button[kind="primary"], [data-testid="stBaseButton-primary"] {
 .sd-kv td.k {width:9.5rem; font-weight:700; color:var(--ink2); background:var(--soft); white-space:nowrap;}
 @media (max-width:640px) {.sd-h1 {font-size:1.6rem;} .block-container {padding-left:1rem; padding-right:1rem;}}
 """
+
+
+def theme_switch_html(dark):
+    """A small Light/Dark button. Streamlit has no official call to change theme, but it remembers
+    the visitor's choice in the browser under 'stActiveTheme-<path>-v2', so the button writes that
+    and reloads the page. If the browser blocks it the button simply does nothing."""
+    target, label = ("Light", "☀️  Switch to light") if dark else ("Dark", "🌙  Switch to dark")
+    ink, line = ("#E7EDF6", "rgba(148,180,255,.35)") if dark else ("#2E2417", "rgba(120,84,30,.35)")
+    return ("<style>html,body{margin:0;background:transparent;overflow:hidden}"
+            "button{font:600 14px Inter,system-ui,sans-serif;color:%s;background:transparent;cursor:pointer;"
+            "border:1px solid %s;border-radius:999px;padding:7px 16px;float:left}"
+            "button:hover{border-color:#0F766E;color:#0F766E}</style>"
+            "<button id='b'>%s</button><script>"
+            "document.getElementById('b').onclick=function(){try{var p=window.parent;"
+            "p.localStorage.setItem('stActiveTheme-'+p.location.pathname+'-v2',JSON.stringify('%s'));"
+            "p.location.reload();}catch(e){}};</script>" % (ink, line, label, target))
