@@ -102,7 +102,7 @@ def draft_reply(subject, result, rows, sender_name=None):
 
 
 def report_markdown(title, result, rows):
-    out = [f"# SDOC verification report", "", f"**Case:** {title}", f"**Verdict:** {result['status']}"]
+    out = [f"# DocHarbor verification report", "", f"**Case:** {title}", f"**Verdict:** {result['status']}"]
     if result.get("review_reason"):
         out.append(f"**Reason:** {REASONS.get(result['review_reason'], result['review_reason'])}")
     out += ["", "| Field | SI | BL | Result |", "|---|---|---|---|"]

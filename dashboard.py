@@ -1,4 +1,4 @@
-"""Dashboard for the SDOC web app: KPI tiles, donuts, a pipeline funnel and an
+"""Dashboard for the DocHarbor web app: KPI tiles, donuts, a pipeline funnel and an
 emphasis bar chart. Colours come from a validated palette (light and dark
 sets checked for colour-blind separation); identity is never colour alone,
 so every chart carries labels and counts.
@@ -199,7 +199,7 @@ def render(rows_all):
         st.write("")
 
     d1, d2, _ = st.columns([1, 1, 3])
-    d1.download_button("⬇️ Results (CSV)", report.to_csv(rows_all), "sdoc_results.csv",
+    d1.download_button("⬇️ Results (CSV)", report.to_csv(rows_all), "docharbor_results.csv",
                     help="A spreadsheet of every email: category, verdict, reason and differing fields. Opens in Excel.")
     d2.download_button("⬇️ submission.json", report.to_submission_json(rows_all), "submission.json",
                     help="The same results in the exact format the hackathon scorer reads.")

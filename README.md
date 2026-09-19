@@ -1,4 +1,4 @@
-# SDOC Verification Pipeline
+# DocHarbor Verification Pipeline
 
 Reads a shipping-ops inbox, classifies every email, and for document-comparison
 requests, checks a Shipping Instruction (SI) against a draft Bill of Lading (BL)
@@ -63,7 +63,7 @@ compares the SI against the BL — writing results to `submission.json`.
 - **Audit trail** per field: value as read, normalised value, rule applied
 - **Draft reply** to the sender, and a downloadable Markdown report per case
 - **Batch mode**: upload many SI/BL files at once, auto-paired by file name
-- **Outbox (simulation)**: after every check SDOC drafts the reply to the sender. OK and mismatch replies go out
+- **Outbox (simulation)**: after every check DocHarbor drafts the reply to the sender. OK and mismatch replies go out
   automatically (mismatch replies can be held for approval); anything needing a human is left for a person.
   Nothing is actually sent, by design.
 - **AI second opinion** on escalated cases (advisory only; the verdict never changes) and optional **AI polish**

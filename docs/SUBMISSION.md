@@ -1,10 +1,10 @@
-# SDOC submission material
+# DocHarbor submission material
 
 Fill in the bracketed items (video link) before submitting.
 
 ## 1. Project description (paste into the submission form)
 
-**Name:** SDOC, Shipping Document Verification
+**Name:** DocHarbor, Shipping Document Verification
 
 **Purpose:** Automatically triage a shipping-operations inbox and verify that a
 Shipping Instruction (SI) and its draft Bill of Lading (BL) agree, so staff only
@@ -15,7 +15,7 @@ spend time on real problems.
 hundreds of emails and four file formats (txt, PDF, Word, Excel), including
 scans. Typos and mismatches that slip through cause amended BLs, delays and cost.
 
-**Solution:** SDOC classifies every email into one of five categories and, for
+**Solution:** DocHarbor classifies every email into one of five categories and, for
 comparison requests, reads both documents, compares the seven fields and returns
 OK, MISMATCH (naming the exact fields) or NEEDS_REVIEW (unreadable file, wrong
 document type, missing attachment, blank field). AI reads the documents; plain,
@@ -25,7 +25,7 @@ auditable code makes the decision.
 
 ## 2. Slide deck outline (about 8 slides)
 
-1. **Title:** SDOC, name, team, one-line pitch.
+1. **Title:** DocHarbor, name, team, one-line pitch.
 2. **Problem:** manual SI vs BL checking; volume, formats, cost of a missed error.
 3. **Solution overview:** inbox in, category + verdict out; three outcomes.
 4. **Technical architecture:** diagram: Inbox loader -> classifier -> document

@@ -1,4 +1,4 @@
-"""SDOC pipeline: inbox -> per-email category + comparison result.
+"""DocHarbor pipeline: inbox -> per-email category + comparison result.
 
     python3 pipeline.py [data_dir] [out.json]
 

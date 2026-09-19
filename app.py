@@ -1,4 +1,4 @@
-"""SDOC web app: inbox dashboard, review queue, document comparison with a
+"""DocHarbor web app: inbox dashboard, review queue, document comparison with a
 visual diff, and draft replies.
 
     streamlit run app.py
@@ -54,7 +54,7 @@ DATA_DIR = Path(__file__).parent
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 STATUS_LABEL = {"OK": "OK", "MISMATCH": "MISMATCH", "NEEDS_REVIEW": "NEEDS REVIEW"}
 
-st.set_page_config(page_title="SDOC Verification", page_icon="🚢", layout="wide")
+st.set_page_config(page_title="DocHarbor Verification", page_icon="🚢", layout="wide")
 st.markdown(style.css(), unsafe_allow_html=True)
 
 
@@ -256,7 +256,7 @@ def show_case(key, title, subject, sender, result, rows, docs=None):
             to_addr = sender if sender and "@" in sender else ""
             st.link_button("✉️ Open in my email app", report.mailto_link(to_addr, subj_val, body_val))
             st.caption("Opens your own mail program with the recipient, subject and message filled in, "
-                       "including any edits above. SDOC does not send email itself.")
+                       "including any edits above. DocHarbor does not send email itself.")
     st.download_button("⬇️ Download report (Markdown)", report.report_markdown(title, result, rows),
                        file_name=f"{key}_report.md", key=f"{key}_dl")
 
@@ -267,12 +267,12 @@ with st.expander("👋 New here? Four quick ways to explore", expanded=True):
     g[0].caption("Open **📊 Dashboard**: every email in the inbox, checked and sorted, with the time it saves.")
     g[1].markdown("**2 · What happens next**")
     g[1].caption("Open **📤 Outbox**, press *Process the inbox*, then click any row to read the reply "
-                 "SDOC drafts. Cases needing a person are left for one.")
+                 "DocHarbor drafts. Cases needing a person are left for one.")
     g[2].markdown("**3 · Try a document**")
     g[2].caption("Open **🔍 Compare documents** and click a ready-made sample: a match, a mismatch, "
                  "a blank field, a scan. Or upload your own.")
     g[3].markdown("**4 · Break it yourself**")
-    g[3].caption("Open **🧪 Playground**, change a weight or a letter in a name, and watch SDOC catch it.")
+    g[3].caption("Open **🧪 Playground**, change a weight or a letter in a name, and watch DocHarbor catch it.")
 
 tab_dash, tab_out, tab_queue, tab_compare, tab_play, tab_inbox = st.tabs(
     ["📊 Dashboard", "📤 Outbox", "🚩 Review queue", "🔍 Compare documents", "🧪 Playground", "📬 Inbox browser"])
@@ -299,7 +299,7 @@ def _approve_all():
 
 
 with tab_out:
-    st.warning("**Simulation mode: no email is actually sent.** This shows what SDOC would send back to "
+    st.warning("**Simulation mode: no email is actually sent.** This shows what DocHarbor would send back to "
                "each sender after every check, and which cases it leaves for a real person. "
                "Real sending is deliberately not connected.")
     o1, o2 = st.columns([1, 1])
@@ -311,7 +311,7 @@ with tab_out:
                                    "at": datetime.now().strftime("%H:%M:%S")}
     ob = st.session_state.get("outbox")
     if not ob:
-        st.info("Press **Process the inbox** to run every check and see the replies SDOC would send.")
+        st.info("Press **Process the inbox** to run every check and see the replies DocHarbor would send.")
     else:
         plan = ob["plan"]
         n_sent = sum(p["delivery"] == report.DELIVERY_SENT for p in plan)
@@ -333,7 +333,7 @@ with tab_out:
                           "Verdict": p["verdict"].replace("_", " "), "Delivery": p["delivery"],
                           "Subject": p["subject"][:70]} for _, p in shown],
                         shown, f"ob_table_{view}_{n_sent}_{n_held}", "ob_pick", lambda t: t[0])
-        st.download_button("⬇️ Outbox log (CSV)", report.outbox_csv(plan), "sdoc_outbox.csv")
+        st.download_button("⬇️ Outbox log (CSV)", report.outbox_csv(plan), "docharbor_outbox.csv")
         if shown:
             idx, item = item_picker("Preview a message", shown, "ob_pick", lambda t: t[0],
                                     lambda t: f"{t[1]['email_id']}: {t[1]['delivery']}")
@@ -465,7 +465,7 @@ with tab_compare:
                 w = csv.DictWriter(buf, fieldnames=["Pair", "Verdict", "Details"])
                 w.writeheader()
                 w.writerows(table)
-                st.download_button("⬇️ Batch results (CSV)", buf.getvalue(), "sdoc_batch_results.csv")
+                st.download_button("⬇️ Batch results (CSV)", buf.getvalue(), "docharbor_batch_results.csv")
                 pick = item_picker("Open a pair", results, "batch_pick", lambda t: t[0], lambda t: t[0])
                 show_case(f"batch_{pick[0]}", pick[0], pick[0], None, pick[1], pick[2])
 

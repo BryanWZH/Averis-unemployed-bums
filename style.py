@@ -34,7 +34,7 @@ def hero(reader_label, ai_on):
              f"<span class='sd-chip'><b>7</b> fields checked</span>"
              f"<span class='sd-chip live'><i class='sd-pulse{' ai' if ai_on else ''}'></i>{reader_label}</span>")
     return ("<div class='sd-top'><div class='sd-top-l'><div class='sd-logo'>🚢</div><div>"
-            "<div class='sd-h1'>SDOC</div><div class='sd-h2'>Shipping Document Verification</div></div></div>"
+            "<div class='sd-h1'>DocHarbor</div><div class='sd-h2'>Shipping Document Verification</div></div></div>"
             f"<div class='sd-chips'>{chips}</div>"
             "<div class='sd-top-p'>Reads every email in a shipping-ops inbox, compares each Shipping "
             "Instruction with its draft Bill of Lading across 7 fields, and hands anything uncertain "
