@@ -25,12 +25,14 @@ REASONS = {
     "unreadable": "A document could not be read (empty, corrupt or an image-only scan).",
     "wrong_doc_type": "A document is not an SI or BL (for example an invoice or packing list).",
     "missing_value": "A field is blank or a placeholder, so it can't be compared.",
+    "reader_disagreement": "The AI reader and the rule-based reader read different values for the same field.",
 }
 NEXT_STEP = {
     "missing_attachment": "Ask the sender to resend both the SI and the draft BL.",
     "unreadable": "Ask for a text-based copy (not a scan) or check the documents manually.",
     "wrong_doc_type": "Ask the sender for the correct SI and draft BL.",
     "missing_value": "Ask the sender to fill in the blank field, then re-check.",
+    "reader_disagreement": "Check the two readings against the original documents and confirm which is right.",
 }
 
 
@@ -230,3 +232,58 @@ def mailto_link(to, subject, body):
     """A mailto: URL that opens the user's mail client pre-filled. Real
     functionality: nothing is sent until the user presses send there."""
     return f"mailto:{quote(to or '', safe='@,')}?subject={quote(subject, safe='')}&body={quote(body, safe='')}"
+
+
+# ------------------------------------------------------------ simulated outbox
+def sender_first_name(sender):
+    """'hanna_azhari@aprilasia.com' -> 'Hanna Azhari' (best effort)."""
+    local = (sender or "").split("@")[0].replace(".", " ").replace("_", " ").strip()
+    return local.title() or None
+
+
+DELIVERY_SENT = "Sent (simulated)"
+DELIVERY_HELD = "Awaiting approval"
+DELIVERY_HUMAN = "Left for a human"
+DELIVERY_NONE = "No reply needed"
+
+
+def plan_replies(rows_all, hold_mismatch=False):
+    """Decide, for every email, whether the system replies on its own.
+
+    - Comparison OK           -> reply automatically
+    - Comparison MISMATCH     -> reply automatically (or hold for approval)
+    - NEEDS_REVIEW            -> never auto-replied; left for a real person
+    - Anything that was not an actual comparison needs no reply
+
+    Nothing is ever really sent: delivery is a simulation. Returns one dict
+    per email that needs attention, in inbox order.
+    """
+    plan = []
+    for r in rows_all:
+        if r["category"] != "BL_COMPARISON":
+            continue
+        result = {"status": r["status"], "review_reason": r["review_reason"],
+                  "defect_fields": r["defect_fields"]}
+        if r["status"] == "NEEDS_REVIEW":
+            delivery = DELIVERY_HUMAN
+        elif not r["rows"]:
+            delivery = DELIVERY_NONE          # e.g. no attachments and no request to compare
+        elif r["status"] == "MISMATCH" and hold_mismatch:
+            delivery = DELIVERY_HELD
+        else:
+            delivery = DELIVERY_SENT
+        if delivery == DELIVERY_NONE:
+            continue
+        subject, body = draft_reply(r["subject"], result, r["rows"], sender_first_name(r["from"]))
+        plan.append({"email_id": r["email_id"], "to": r["from"], "subject": subject, "body": body,
+                     "verdict": r["status"], "delivery": delivery})
+    return plan
+
+
+def outbox_csv(plan):
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["email_id", "to", "verdict", "delivery", "subject"])
+    for p in plan:
+        w.writerow([p["email_id"], p["to"], p["verdict"], p["delivery"], p["subject"]])
+    return buf.getvalue()

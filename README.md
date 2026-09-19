@@ -62,6 +62,12 @@ compares the SI against the BL — writing results to `submission.json`.
 - **Audit trail** per field: value as read, normalised value, rule applied
 - **Draft reply** to the sender, and a downloadable Markdown report per case
 - **Batch mode**: upload many SI/BL files at once, auto-paired by file name
+- **Outbox (simulation)**: after every check SDOC drafts the reply to the sender. OK and mismatch replies go out
+  automatically (mismatch replies can be held for approval); anything needing a human is left for a person.
+  Nothing is actually sent, by design.
+- **AI second opinion** on escalated cases (advisory only; the verdict never changes) and optional **AI polish**
+  of reply wording (rejected automatically if the AI changes a value or adds a number)
+- **Cross-check mode**: the AI and rule-based readers must agree on every field, or the case goes to a human
 
 ## Try it in the browser
 
@@ -106,3 +112,14 @@ rule-based reader is used even if a key is present:
 
 - PowerShell: `$env:SDOC_NO_AI="1"`
 - Mac/Linux: `export SDOC_NO_AI=1`
+
+## Measuring the AI reader (one paid run)
+
+```
+python evaluate_ai.py . --truth path/to/ground_truth.json
+```
+
+Reads each document with the AI once (saved to `.ai_cache/`, so reruns are free) and reports, for both
+"AI reads, code decides" and "AI + rule-based cross-check": decisions right, defects caught, false alarms and
+false escalations. It writes `submission_ai_only.json` and `submission_cross_check.json` for the scorer.
+Use `--limit 30` for a cheap trial first. Without a key it refuses to run and spends nothing.

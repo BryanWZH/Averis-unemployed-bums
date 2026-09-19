@@ -79,11 +79,29 @@ def _read(reader, data, name, use_ai):
     return reader(data, name)
 
 
-def compare_documents(si_bytes, si_name, bl_bytes, bl_name, use_ai=None):
+def reader_disagreements(a_res, b_res):
+    """Fields where two readers returned a value for the same document but the
+    normalised values differ. A field only one reader found is not a
+    disagreement (that is just missing information)."""
+    out = []
+    for f in COMPARE_FIELDS:
+        av, bv = a_res.fields.get(f), b_res.fields.get(f)
+        if is_blank_value(av) or is_blank_value(bv):
+            continue
+        if normalize_value(f, av) != normalize_value(f, bv):
+            out.append(f)
+    return out
+
+
+def compare_documents(si_bytes, si_name, bl_bytes, bl_name, use_ai=None, cross_check=False):
     """Read an SI and a draft BL and compare the 7 fields.
 
     Returns (result, si_res, bl_res); the extraction results let a UI show
     what was read. use_ai=None means "AI if a key is set".
+
+    cross_check=True (only meaningful with AI on) also reads both documents
+    with the rule-based reader; if the two readers disagree on any field the
+    case is escalated (reason "reader_disagreement") instead of decided.
     """
     if use_ai is None:
         use_ai = ai_extract.available()
@@ -91,6 +109,50 @@ def compare_documents(si_bytes, si_name, bl_bytes, bl_name, use_ai=None):
     si_res = _read(reader, si_bytes, si_name, use_ai)
     bl_res = _read(reader, bl_bytes, bl_name, use_ai)
 
+    result = decide_from_results(si_res, bl_res)
+    if cross_check and use_ai and result["status"] in ("OK", "MISMATCH"):
+        si_rule = extract.extract(si_bytes, si_name)
+        bl_rule = extract.extract(bl_bytes, bl_name)
+        if si_rule.readable and bl_rule.readable:
+            si_bad = reader_disagreements(si_res, si_rule)
+            bl_bad = reader_disagreements(bl_res, bl_rule)
+            if si_bad or bl_bad:
+                result = _empty_result("NEEDS_REVIEW", "reader_disagreement")
+                result["disagreements"] = {"si": si_bad, "bl": bl_bad}
+    return result, si_res, bl_res
+
+
+def second_opinion(si_bytes, si_name, bl_bytes, bl_name):
+    """Advisory only: let the AI read documents the system escalated (for
+    example an image-only scan) and say which fields look different. The
+    official verdict stays with the deterministic pipeline; this never
+    changes it."""
+    si_res = ai_extract.ai_extract(si_bytes, si_name)
+    bl_res = ai_extract.ai_extract(bl_bytes, bl_name)
+    if not si_res.readable or not bl_res.readable:
+        return {"available": False, "note": "The AI could not read one of the documents.",
+                "si_res": si_res, "bl_res": bl_res, "suggested_defects": []}
+    if si_res.wrong_doc_type or bl_res.wrong_doc_type:
+        return {"available": False, "note": "The AI believes one document is not an SI or BL.",
+                "si_res": si_res, "bl_res": bl_res, "suggested_defects": []}
+    suggested = []
+    for f in COMPARE_FIELDS:
+        sv, bv = si_res.fields.get(f), bl_res.fields.get(f)
+        if is_blank_value(sv) or is_blank_value(bv):
+            continue
+        if normalize_value(f, sv) != normalize_value(f, bv):
+            suggested.append(f)
+    return {"available": True, "note": "", "si_res": si_res, "bl_res": bl_res,
+            "suggested_defects": sorted(suggested)}
+
+
+def decide_from_results(si_res, bl_res):
+    """The deterministic decision, given two already-read documents."""
+    result, _, _ = _decide(si_res, bl_res)
+    return result
+
+
+def _decide(si_res, bl_res):
     if not si_res.readable or not bl_res.readable:
         return _empty_result("NEEDS_REVIEW", "unreadable"), si_res, bl_res
 

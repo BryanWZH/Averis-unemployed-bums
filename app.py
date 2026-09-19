@@ -4,6 +4,7 @@ visual diff, and draft replies.
     streamlit run app.py
 """
 import os
+from datetime import datetime
 from pathlib import Path
 
 import streamlit as st
@@ -16,6 +17,7 @@ except Exception:
     pass
 
 import ai_extract
+import ai_reply
 import classify
 import dashboard
 import pipeline
@@ -60,6 +62,7 @@ st.caption("Reads every email in a shipping-ops inbox, compares each Shipping In
 access_code = _secret("AI_ACCESS_CODE")
 ai_ready = ai_extract.available() and bool(access_code)
 use_ai = False
+cross_check = False
 st.sidebar.header("Reader")
 if ai_ready:
     entered = st.sidebar.text_input("AI access code", type="password",
@@ -70,6 +73,10 @@ if ai_ready:
         help="AI reads the documents; plain code does the comparing and deciding.")
     if not unlocked:
         st.sidebar.info("Using the free rule-based reader. Enter the access code to use AI reading.")
+    cross_check = st.sidebar.toggle(
+        "Cross-check AI with the rule-based reader", value=False, disabled=not use_ai,
+        help="Both readers read every document. If they disagree on any field the case goes to a "
+             "human instead of being decided.")
 else:
     st.sidebar.info("Using the rule-based reader (no AI calls are made).")
 st.sidebar.markdown("---")
@@ -88,7 +95,33 @@ def badge(status):
                 unsafe_allow_html=True)
 
 
-def show_case(key, title, subject, sender, result, rows):
+@st.cache_data(show_spinner=False, max_entries=64)
+def cached_compare(si_bytes, si_name, bl_bytes, bl_name, use_ai=False, cross_check=False):
+    """compare_documents, cached. Streamlit re-runs every tab on every click, so
+    without this an AI read would be repeated (and billed) on each interaction."""
+    return pipeline.compare_documents(si_bytes, si_name, bl_bytes, bl_name,
+                                      use_ai=use_ai, cross_check=cross_check)
+
+
+def docs_for(email):
+    """(si_bytes, si_name, bl_bytes, bl_name) for an email with both attachments, else None."""
+    atts = email.get("attachments", []) or []
+    if len(atts) < 2:
+        return None
+    si_path, bl_path = pipeline._pick_si_bl(atts)
+    if not (si_path and bl_path):
+        return None
+    inbox = Inbox(str(DATA_DIR))
+    return inbox.read_bytes(si_path), si_path, inbox.read_bytes(bl_path), bl_path
+
+
+def _apply_polish(key, body, facts):
+    text, used = ai_reply.polish(body, facts)
+    st.session_state[f"{key}_body"] = text
+    st.session_state[f"{key}_polished"] = used
+
+
+def show_case(key, title, subject, sender, result, rows, docs=None):
     """Verdict, side-by-side field table with a character-level diff,
     then the draft reply and report downloads."""
     badge(result["status"])
@@ -99,6 +132,29 @@ def show_case(key, title, subject, sender, result, rows):
         reason = result.get("review_reason")
         st.markdown(f"**Why:** {report.REASONS.get(reason, reason)}")
         st.markdown(f"**Suggested next step:** {report.NEXT_STEP.get(reason, 'Check manually.')}")
+        dis = result.get("disagreements")
+        if dis:
+            names = sorted(set(dis["si"]) | set(dis["bl"]))
+            st.markdown("**Readers disagree on:** " + ", ".join(report.FIELD_NAMES[f] for f in names))
+        if use_ai and docs:
+            if st.button("🤖 Ask AI for a second opinion", key=f"{key}_op_btn"):
+                with st.spinner("The AI is reading the documents..."):
+                    st.session_state[f"{key}_op"] = pipeline.second_opinion(*docs)
+            op = st.session_state.get(f"{key}_op")
+            if op:
+                if op["available"] and op["suggested_defects"]:
+                    lines = []
+                    for f in op["suggested_defects"]:
+                        lines.append(f"- **{report.FIELD_NAMES[f]}**: SI `{op['si_res'].fields.get(f)}` "
+                                     f"vs BL `{op['bl_res'].fields.get(f)}`")
+                    st.info("🤖 **AI second opinion (advisory only, the verdict above is unchanged).** "
+                            "The AI thinks these fields differ; please confirm against the originals:"
+                            + chr(10) * 2 + chr(10).join(lines))
+                elif op["available"]:
+                    st.info("🤖 **AI second opinion (advisory only).** The AI found no differences in the "
+                            "fields it could read. A person should still confirm.")
+                else:
+                    st.info("🤖 **AI second opinion (advisory only).** " + op["note"])
     else:
         st.markdown("All 7 fields match.")
 
@@ -128,10 +184,19 @@ def show_case(key, title, subject, sender, result, rows):
 
     if result["status"] != "OK" or rows:
         with st.expander("✉️ Draft reply to the sender", expanded=result["status"] != "OK"):
-            first = (sender or "").split("@")[0].replace(".", " ").replace("_", " ").title() or None
+            first = report.sender_first_name(sender)
             subj, body = report.draft_reply(subject or title, result, rows, first)
             subj_val = st.text_input("Subject", subj, key=f"{key}_subj")
             body_val = st.text_area("Message", body, height=280, key=f"{key}_body")
+            if use_ai and result["status"] != "NEEDS_REVIEW":
+                facts = [v for r_ in rows if r_["verdict"] == "mismatch" for v in (r_["si"], r_["bl"])]
+                st.button("✨ Polish wording with AI", key=f"{key}_polish",
+                          on_click=_apply_polish, args=(key, body, facts),
+                          help="Rewords the message. If the AI changes any value or adds a number, "
+                               "the original template is kept.")
+                if st.session_state.get(f"{key}_polished") is False:
+                    st.caption("The AI rewrite was rejected (it changed a fact or failed), so the "
+                               "template is kept.")
             to_addr = sender if sender and "@" in sender else ""
             st.link_button("✉️ Open in my email app", report.mailto_link(to_addr, subj_val, body_val))
             st.caption("Opens your own mail program with the recipient, subject and message filled in, "
@@ -140,12 +205,74 @@ def show_case(key, title, subject, sender, result, rows):
                        file_name=f"{key}_report.md", key=f"{key}_dl")
 
 
-tab_dash, tab_queue, tab_compare, tab_inbox = st.tabs(
-    ["📊 Dashboard", "🚩 Review queue", "🔍 Compare documents", "📬 Inbox browser"])
+tab_dash, tab_out, tab_queue, tab_compare, tab_inbox = st.tabs(
+    ["📊 Dashboard", "📤 Outbox", "🚩 Review queue", "🔍 Compare documents", "📬 Inbox browser"])
 
 # ------------------------------------------------------------------ dashboard
 with tab_dash:
     dashboard.render(load_analysis())
+
+# --------------------------------------------------------------------- outbox
+def _approve(idx):
+    st.session_state.outbox["plan"][idx]["delivery"] = report.DELIVERY_SENT
+    st.session_state.outbox["plan"][idx]["approved"] = True
+
+
+def _approve_all():
+    for item in st.session_state.outbox["plan"]:
+        if item["delivery"] == report.DELIVERY_HELD:
+            item["delivery"] = report.DELIVERY_SENT
+            item["approved"] = True
+
+
+with tab_out:
+    st.warning("**Simulation mode: no email is actually sent.** This shows what SDOC would send back to "
+               "each sender after every check, and which cases it leaves for a real person. "
+               "Real sending is deliberately not connected.")
+    o1, o2 = st.columns([1, 1])
+    hold = o1.toggle("Hold mismatch replies for approval", value=False,
+                     help="Off: OK and mismatch replies go out automatically. "
+                          "On: mismatch replies wait for a person to approve them.")
+    if o2.button("▶ Process the inbox", type="primary"):
+        st.session_state.outbox = {"plan": report.plan_replies(load_analysis(), hold_mismatch=hold),
+                                   "at": datetime.now().strftime("%H:%M:%S")}
+    ob = st.session_state.get("outbox")
+    if not ob:
+        st.info("Press **Process the inbox** to run every check and see the replies SDOC would send.")
+    else:
+        plan = ob["plan"]
+        n_sent = sum(p["delivery"] == report.DELIVERY_SENT for p in plan)
+        n_held = sum(p["delivery"] == report.DELIVERY_HELD for p in plan)
+        n_human = sum(p["delivery"] == report.DELIVERY_HUMAN for p in plan)
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Replied automatically (simulated)", n_sent)
+        m2.metric("Awaiting your approval", n_held)
+        m3.metric("Left for a real person", n_human)
+        st.caption(f"Processed at {ob['at']}. Cases that need a human are never answered automatically.")
+        if n_held:
+            st.button(f"✅ Approve all {n_held} held replies", on_click=_approve_all)
+
+        view = st.radio("Show", ["All", report.DELIVERY_SENT, report.DELIVERY_HELD, report.DELIVERY_HUMAN],
+                        horizontal=True)
+        shown = [(i, p) for i, p in enumerate(plan) if view == "All" or p["delivery"] == view]
+        icon = {report.DELIVERY_SENT: "📤", report.DELIVERY_HELD: "⏳", report.DELIVERY_HUMAN: "🧑"}
+        st.dataframe([{"": icon[p["delivery"]], "Email": p["email_id"], "To": p["to"],
+                       "Verdict": p["verdict"].replace("_", " "), "Delivery": p["delivery"],
+                       "Subject": p["subject"][:70]} for _, p in shown],
+                     hide_index=True, width="stretch")
+        st.download_button("⬇️ Outbox log (CSV)", report.outbox_csv(plan), "sdoc_outbox.csv")
+        if shown:
+            idx, item = st.selectbox("Preview a message", shown,
+                                     format_func=lambda t: f"{t[1]['email_id']}: {t[1]['delivery']}")
+            st.markdown(f"**To:** {item['to']}")
+            st.markdown(f"**Subject:** {item['subject']}")
+            st.text_area("Message", item["body"], height=260, disabled=True, key=f"ob_body_{idx}")
+            if item["delivery"] == report.DELIVERY_HELD:
+                st.button("✅ Approve (simulated send)", key=f"ob_ok_{idx}", on_click=_approve, args=(idx,))
+            elif item["delivery"] == report.DELIVERY_HUMAN:
+                st.info("A person must resolve this case. The message above is only a starting point.")
+                st.link_button("✉️ Open in my email app",
+                               report.mailto_link(item["to"], item["subject"], item["body"]))
 
 # --------------------------------------------------------------- review queue
 with tab_queue:
@@ -175,7 +302,7 @@ with tab_queue:
         email = Inbox(str(DATA_DIR)).get(pick["email_id"])
         show_case(f"q_{pick['email_id']}", pick["email_id"], pick["subject"], email.get("from"),
                   {"status": pick["status"], "review_reason": pick["review_reason"],
-                   "defect_fields": pick["defect_fields"]}, pick["rows"])
+                   "defect_fields": pick["defect_fields"]}, pick["rows"], docs=docs_for(email))
     else:
         st.success("Nothing to review.")
 
@@ -192,8 +319,9 @@ with tab_compare:
                 st.error("Files must be 5 MB or smaller.")
             else:
                 with st.spinner("Reading and comparing..."):
-                    result, si_res, bl_res = pipeline.compare_documents(
-                        si_file.getvalue(), si_file.name, bl_file.getvalue(), bl_file.name, use_ai=use_ai)
+                    result, si_res, bl_res = cached_compare(
+                        si_file.getvalue(), si_file.name, bl_file.getvalue(), bl_file.name, use_ai=use_ai,
+                        cross_check=cross_check)
                 show_case("upload", f"{si_file.name} vs {bl_file.name}", "Your documents", None,
                           result, report.field_rows(si_res, bl_res))
     else:
@@ -214,8 +342,8 @@ with tab_compare:
                     results.append((key, {"status": "NEEDS_REVIEW", "review_reason": "unreadable",
                                           "defect_fields": []}, []))
                     continue
-                res, si_res, bl_res = pipeline.compare_documents(
-                    si_f.getvalue(), si_name, bl_f.getvalue(), bl_name, use_ai=use_ai)
+                res, si_res, bl_res = cached_compare(
+                    si_f.getvalue(), si_name, bl_f.getvalue(), bl_name, use_ai=use_ai, cross_check=cross_check)
                 results.append((key, res, report.field_rows(si_res, bl_res)))
             if len(pairs) > 50:
                 st.info("Showing the first 50 pairs.")
@@ -268,11 +396,11 @@ with tab_inbox:
                 if si_path and bl_path:
                     inbox = Inbox(str(DATA_DIR))
                     with st.spinner("Reading with AI..."):
-                        result, si_res, bl_res = pipeline.compare_documents(
+                        result, si_res, bl_res = cached_compare(
                             inbox.read_bytes(si_path), si_path, inbox.read_bytes(bl_path), bl_path,
-                            use_ai=True)
+                            use_ai=True, cross_check=cross_check)
                     rows = report.field_rows(si_res, bl_res)
             show_case(f"in_{pick['email_id']}", pick["email_id"], email.get("subject"),
-                      email.get("from"), result, rows)
+                      email.get("from"), result, rows, docs=docs_for(email))
         else:
             st.info("No document comparison needed for this email.")
