@@ -1,6 +1,6 @@
 # SDOC submission material
 
-Fill in the bracketed items (team name, links) before submitting.
+Fill in the bracketed items (video link) before submitting.
 
 ## 1. Project description (paste into the submission form)
 
@@ -20,6 +20,8 @@ comparison requests, reads both documents, compares the seven fields and returns
 OK, MISMATCH (naming the exact fields) or NEEDS_REVIEW (unreadable file, wrong
 document type, missing attachment, blank field). AI reads the documents; plain,
 auditable code makes the decision.
+
+**Extras:** a dashboard with time-saved estimates, a review queue, a simulated Outbox that drafts a reply to every sender (uncertain cases are held for a person; nothing is really emailed), a Playground for breaking a document and watching the verdict change, an audit trail for every field, and optional AI second opinion and reply polishing that can never change a verdict.
 
 ## 2. Slide deck outline (about 8 slides)
 
