@@ -40,12 +40,32 @@ st.title("🚢 SDOC: Shipping Document Verification")
 st.caption("Checks a Shipping Instruction (SI) against a draft Bill of Lading (BL) "
            "across 7 fields, and escalates to a human when it can't tell.")
 
-ai_ready = ai_extract.available()
-use_ai = st.sidebar.toggle(
-    "Read documents with AI", value=ai_ready, disabled=not ai_ready,
-    help="AI reads the documents; plain code does the comparing and deciding.")
-if not ai_ready:
-    st.sidebar.info("No API key configured, so the rule-based reader is used.")
+def _secret(name):
+    value = os.environ.get(name)
+    if not value:
+        try:
+            value = st.secrets.get(name)
+        except Exception:
+            value = None
+    return (value or "").strip()
+
+
+# AI reading spends API credit, and this page is public. It stays OFF for
+# everyone unless AI_ACCESS_CODE is configured AND the visitor enters it.
+access_code = _secret("AI_ACCESS_CODE")
+ai_ready = ai_extract.available() and bool(access_code)
+use_ai = False
+if ai_ready:
+    entered = st.sidebar.text_input("AI access code", type="password",
+                                    help="Optional. Unlocks AI document reading.")
+    unlocked = bool(entered) and entered.strip() == access_code
+    use_ai = st.sidebar.toggle(
+        "Read documents with AI", value=unlocked, disabled=not unlocked,
+        help="AI reads the documents; plain code does the comparing and deciding.")
+    if not unlocked:
+        st.sidebar.info("Using the free rule-based reader. Enter the access code to use AI reading.")
+else:
+    st.sidebar.info("Using the rule-based reader (no AI calls are made).")
 
 
 def show_result(result, si_res, bl_res):
