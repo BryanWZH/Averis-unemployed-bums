@@ -103,6 +103,24 @@ def cached_compare(si_bytes, si_name, bl_bytes, bl_name, use_ai=False, cross_che
                                       use_ai=use_ai, cross_check=cross_check)
 
 
+def clickable_table(data, items, table_key, pick_key):
+    """A table where clicking any cell opens that row in the picker below it.
+    `items` must line up row-for-row with `data`; `pick_key` is the session key of
+    the selectbox that shows the chosen item. A click only changes the picker when
+    it is a NEW click, so the picker can still be used on its own afterwards."""
+    ev = st.dataframe(data, hide_index=True, width="stretch", on_select="rerun",
+                      selection_mode="single-cell", key=table_key)
+    cells = [tuple(c) for c in ev.selection.cells]
+    last_key = table_key + "_last"
+    clicked = report.selection_change(cells, st.session_state.get(last_key))
+    st.session_state[last_key] = cells
+    if clicked is not None and clicked[0] < len(items):
+        st.session_state[pick_key] = items[clicked[0]]
+    if st.session_state.get(pick_key) not in items:
+        st.session_state.pop(pick_key, None)
+    st.caption("Click any row to open it below.")
+
+
 def docs_for(email):
     """(si_bytes, si_name, bl_bytes, bl_name) for an email with both attachments, else None."""
     atts = email.get("attachments", []) or []
@@ -256,18 +274,10 @@ with tab_out:
                         horizontal=True)
         shown = [(i, p) for i, p in enumerate(plan) if view == "All" or p["delivery"] == view]
         icon = {report.DELIVERY_SENT: "📤", report.DELIVERY_HELD: "⏳", report.DELIVERY_HUMAN: "🧑"}
-        ev = st.dataframe([{"": icon[p["delivery"]], "Email": p["email_id"], "To": p["to"],
-                            "Verdict": p["verdict"].replace("_", " "), "Delivery": p["delivery"],
-                            "Subject": p["subject"][:70]} for _, p in shown],
-                          hide_index=True, width="stretch", on_select="rerun",
-                          selection_mode="single-row", key="ob_table")
-        clicked = report.selection_change(ev.selection.rows, st.session_state.get("ob_last_sel"))
-        st.session_state["ob_last_sel"] = list(ev.selection.rows)
-        if clicked is not None and clicked < len(shown):
-            st.session_state["ob_pick"] = shown[clicked]
-        if st.session_state.get("ob_pick") not in shown:
-            st.session_state.pop("ob_pick", None)
-        st.caption("Click a row to preview its message.")
+        clickable_table([{"": icon[p["delivery"]], "Email": p["email_id"], "To": p["to"],
+                          "Verdict": p["verdict"].replace("_", " "), "Delivery": p["delivery"],
+                          "Subject": p["subject"][:70]} for _, p in shown],
+                        shown, "ob_table", "ob_pick")
         st.download_button("⬇️ Outbox log (CSV)", report.outbox_csv(plan), "sdoc_outbox.csv")
         if shown:
             idx, item = st.selectbox("Preview a message", shown, key="ob_pick",
@@ -299,20 +309,12 @@ with tab_queue:
                                        format_func=lambda x: x.replace("_", " "))
         items = [r for r in items if r["review_reason"] in reason_filter]
     if items:
-        qev = st.dataframe(
+        clickable_table(
             [{"Email": r["email_id"], "Subject": r["subject"][:70],
               "Reason / fields": (r["review_reason"] or "").replace("_", " ") if view == "Needs review"
               else ", ".join(report.FIELD_NAMES[f] for f in r["defect_fields"]),
               "Next step": report.NEXT_STEP.get(r["review_reason"], "Correct the flagged fields.")}
-             for r in items], hide_index=True, width="stretch", on_select="rerun",
-            selection_mode="single-row", key="q_table")
-        q_clicked = report.selection_change(qev.selection.rows, st.session_state.get("q_last_sel"))
-        st.session_state["q_last_sel"] = list(qev.selection.rows)
-        if q_clicked is not None and q_clicked < len(items):
-            st.session_state["q_pick"] = items[q_clicked]
-        if st.session_state.get("q_pick") not in items:
-            st.session_state.pop("q_pick", None)
-        st.caption("Click a row to open that case.")
+             for r in items], items, "q_table", "q_pick")
         pick = st.selectbox("Open a case", items, key="q_pick",
                             format_func=lambda r: f"{r['email_id']}: {r['subject'][:70]}")
         email = Inbox(str(DATA_DIR)).get(pick["email_id"])
@@ -375,14 +377,14 @@ with tab_compare:
                                       else report.REASONS.get(r["review_reason"], "") if r["status"] == "NEEDS_REVIEW"
                                       else "All 7 fields match")}
                          for k, r, _ in results]
-                st.dataframe(table, hide_index=True, width="stretch")
+                clickable_table(table, results, "batch_table", "batch_pick")
                 import csv, io
                 buf = io.StringIO()
                 w = csv.DictWriter(buf, fieldnames=["Pair", "Verdict", "Details"])
                 w.writeheader()
                 w.writerows(table)
                 st.download_button("⬇️ Batch results (CSV)", buf.getvalue(), "sdoc_batch_results.csv")
-                pick = st.selectbox("Open a pair", results, format_func=lambda t: t[0])
+                pick = st.selectbox("Open a pair", results, key="batch_pick", format_func=lambda t: t[0])
                 show_case(f"batch_{pick[0]}", pick[0], pick[0], None, pick[1], pick[2])
 
 # --------------------------------------------------------------- inbox browser
@@ -396,7 +398,10 @@ with tab_inbox:
     shown = [r for r in rows_all if r["category"] in cat_sel and text_sel.lower() in r["subject"].lower()]
     st.caption(f"{len(shown)} emails")
     if shown:
-        pick = st.selectbox("Pick an email", shown,
+        clickable_table([{"Email": r["email_id"], "Category": r["category"].replace("_", " ").title(),
+                          "Verdict": r["status"].replace("_", " "), "Subject": r["subject"][:80]}
+                         for r in shown], shown, "ib_table", "ib_pick")
+        pick = st.selectbox("Pick an email", shown, key="ib_pick",
                             format_func=lambda r: f"{r['email_id']}: {r['subject'][:80]}")
         email = Inbox(str(DATA_DIR)).get(pick["email_id"])
         st.markdown(f"**Category:** `{pick['category']}`  ·  **From:** {email.get('from', '')}")

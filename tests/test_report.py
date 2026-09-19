@@ -50,10 +50,10 @@ def test_mailto_link_is_prefilled_and_safe():
 
 
 def test_selection_change_only_fires_on_a_new_click():
-    assert report.selection_change([3], None) == 3          # first click
-    assert report.selection_change([3], [3]) is None        # same selection re-run: leave the dropdown alone
-    assert report.selection_change([5], [3]) == 5           # clicked another row
-    assert report.selection_change([], [3]) is None         # deselected
+    assert report.selection_change([(3, "Email")], None) == (3, "Email")     # first click
+    assert report.selection_change([(3, "Email")], [(3, "Email")]) is None   # same selection re-run
+    assert report.selection_change([(5, "Subject")], [(3, "Email")]) == (5, "Subject")
+    assert report.selection_change([], [(3, "Email")]) is None               # deselected
 
 
 if __name__ == "__main__":
