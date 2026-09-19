@@ -17,6 +17,7 @@ except Exception:
 
 import ai_extract
 import classify
+import dashboard
 import pipeline
 import report
 from loader import Inbox
@@ -140,38 +141,7 @@ tab_dash, tab_queue, tab_compare, tab_inbox = st.tabs(
 
 # ------------------------------------------------------------------ dashboard
 with tab_dash:
-    rows_all = load_analysis()
-    s = report.summarize(rows_all)
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Emails processed", s["total"])
-    m2.metric("Document comparisons", s["compared"])
-    m3.metric("Mismatches caught", s["status"].get("MISMATCH", 0))
-    m4.metric("Sent to a human", s["status"].get("NEEDS_REVIEW", 0))
-
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown("##### Emails by category")
-        st.bar_chart(s["categories"], horizontal=True, color="#0e9f9a")
-    with c2:
-        st.markdown("##### Which fields go wrong most")
-        st.bar_chart({report.FIELD_NAMES[k]: v for k, v in s["defect_fields"].items()},
-                     horizontal=True, color="#c0392b")
-    c3, c4 = st.columns(2)
-    with c3:
-        st.markdown("##### Outcome of the comparisons")
-        comp = [r for r in rows_all if r["category"] == "BL_COMPARISON"]
-        st.bar_chart({"OK": sum(r["status"] == "OK" for r in comp),
-                      "Mismatch": sum(r["status"] == "MISMATCH" for r in comp),
-                      "Needs review": sum(r["status"] == "NEEDS_REVIEW" for r in comp)},
-                     horizontal=True)
-    with c4:
-        st.markdown("##### Why documents went to a human")
-        st.bar_chart({k.replace("_", " "): v for k, v in s["review_reasons"].items()},
-                     horizontal=True, color="#b9770e")
-
-    d1, d2, _ = st.columns([1, 1, 3])
-    d1.download_button("⬇️ Results (CSV)", report.to_csv(rows_all), "sdoc_results.csv")
-    d2.download_button("⬇️ submission.json", report.to_submission_json(rows_all), "submission.json")
+    dashboard.render(load_analysis())
 
 # --------------------------------------------------------------- review queue
 with tab_queue:
