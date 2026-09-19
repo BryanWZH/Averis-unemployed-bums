@@ -86,3 +86,12 @@ endpoint (see the participant bundle's own README for that).
 
 Never commit the API key to GitHub or paste it in chat/Slack. Set it as an
 environment variable only, as shown above.
+
+## Working without spending API credit
+
+AI reading is used only when `ANTHROPIC_API_KEY` is set. To be certain it is
+never used (for example while developing), set `SDOC_NO_AI=1`; the free
+rule-based reader is used even if a key is present:
+
+- PowerShell: `$env:SDOC_NO_AI="1"`
+- Mac/Linux: `export SDOC_NO_AI=1`
