@@ -56,6 +56,32 @@ def test_selection_change_only_fires_on_a_new_click():
     assert report.selection_change([], [(3, "Email")]) is None               # deselected
 
 
+def test_edited_result_uses_the_real_engine():
+    same = {"shipper": "ACME LTD", "consignee": "BOB PTE LTD", "notify_party": "BOB PTE LTD",
+            "port_of_loading": "SINGAPORE (SGSIN)", "port_of_discharge": "KOPER, SLOVENIA (SIKOP)",
+            "container_count": "3 x 40'HC", "gross_weight_kg": "61,026 KG"}
+    res, rows = report.edited_result(same, dict(same, gross_weight_kg="61,026.00 KGS"))
+    assert res["status"] == "OK"                                     # same weight, written differently
+    res, _ = report.edited_result(same, dict(same, gross_weight_kg=report.tweak_weight("61,026 KG")))
+    assert res["status"] == "MISMATCH" and res["defect_fields"] == ["gross_weight_kg"]
+    res, _ = report.edited_result(same, dict(same, consignee=report.tweak_typo("BOB PTE LTD")))
+    assert res["status"] == "MISMATCH" and res["defect_fields"] == ["consignee"]
+    res, _ = report.edited_result(same, dict(same, notify_party=""))
+    assert res["status"] == "NEEDS_REVIEW" and res["review_reason"] == "missing_value"
+
+
+def test_time_saved_only_counts_real_automatic_checks():
+    rows = [
+        {"category": "BL_COMPARISON", "rows": [1], "status": "OK"},
+        {"category": "BL_COMPARISON", "rows": [1], "status": "MISMATCH"},
+        {"category": "BL_COMPARISON", "rows": [], "status": "OK"},           # no documents: not a check
+        {"category": "BL_COMPARISON", "rows": [], "status": "NEEDS_REVIEW"},
+        {"category": "SPAM", "rows": [], "status": "OK"},
+    ]
+    t = report.time_saved(rows, minutes_per_check=5, minutes_per_reply=2)
+    assert t["checks"] == 2 and t["escalated"] == 1 and t["minutes"] == 14 and round(t["hours"], 2) == 0.23
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

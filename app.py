@@ -20,9 +20,12 @@ import ai_extract
 import ai_reply
 import classify
 import dashboard
+import extract
 import pipeline
 import report
+import samples
 from loader import Inbox
+from normalize import COMPARE_FIELDS
 
 DATA_DIR = Path(__file__).parent
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
@@ -103,11 +106,14 @@ def cached_compare(si_bytes, si_name, bl_bytes, bl_name, use_ai=False, cross_che
                                       use_ai=use_ai, cross_check=cross_check)
 
 
-def clickable_table(data, items, table_key, pick_key):
-    """A table where clicking any cell opens that row in the picker below it.
-    `items` must line up row-for-row with `data`; `pick_key` is the session key of
-    the selectbox that shows the chosen item. A click only changes the picker when
-    it is a NEW click, so the picker can still be used on its own afterwards."""
+def clickable_table(data, items, table_key, sel_key, id_fn):
+    """A table where clicking any cell selects that row. The chosen item is stored
+    by its own id under `sel_key` (see item_picker). `items` must line up
+    row-for-row with `data`. A click only counts when it is a NEW click, so the
+    dropdown below can still be used on its own afterwards."""
+    # Streamlit keeps a table's selection tied to its key even after the rows change, and the
+    # stale selection swallows the next click. Callers therefore put whatever decides the table's
+    # contents (the active filter, the counts) into `table_key`, so each view starts clean.
     ev = st.dataframe(data, hide_index=True, width="stretch", on_select="rerun",
                       selection_mode="single-cell", key=table_key)
     cells = [tuple(c) for c in ev.selection.cells]
@@ -115,10 +121,21 @@ def clickable_table(data, items, table_key, pick_key):
     clicked = report.selection_change(cells, st.session_state.get(last_key))
     st.session_state[last_key] = cells
     if clicked is not None and clicked[0] < len(items):
-        st.session_state[pick_key] = items[clicked[0]]
-    if st.session_state.get(pick_key) not in items:
-        st.session_state.pop(pick_key, None)
+        st.session_state[sel_key] = id_fn(items[clicked[0]])
     st.caption("Click any row to open it below.")
+
+
+def item_picker(label, items, sel_key, id_fn, format_func):
+    """The dropdown that shows the selected item. Streamlit resets a dropdown whenever
+    its option list changes (for example when a filter is switched), so the choice is
+    kept by id in session state and the widget is rebuilt from it every time."""
+    ids = [id_fn(x) for x in items]
+    cur = st.session_state.get(sel_key)
+    index = ids.index(cur) if cur in ids else 0
+    choice = st.selectbox(label, items, index=index, key=f"{sel_key}__{cur}", format_func=format_func)
+    if id_fn(choice) != cur:
+        st.session_state[sel_key] = id_fn(choice)      # the user used the dropdown itself
+    return choice
 
 
 def docs_for(email):
@@ -223,8 +240,21 @@ def show_case(key, title, subject, sender, result, rows, docs=None):
                        file_name=f"{key}_report.md", key=f"{key}_dl")
 
 
-tab_dash, tab_out, tab_queue, tab_compare, tab_inbox = st.tabs(
-    ["📊 Dashboard", "📤 Outbox", "🚩 Review queue", "🔍 Compare documents", "📬 Inbox browser"])
+with st.expander("👋 New here? Four quick ways to explore", expanded=True):
+    g = st.columns(4)
+    g[0].markdown("**1 · The big picture**")
+    g[0].caption("Open **📊 Dashboard**: every email in the inbox, checked and sorted, with the time it saves.")
+    g[1].markdown("**2 · What happens next**")
+    g[1].caption("Open **📤 Outbox**, press *Process the inbox*, then click any row to read the reply "
+                 "SDOC drafts. Cases needing a person are left for one.")
+    g[2].markdown("**3 · Try a document**")
+    g[2].caption("Open **🔍 Compare documents** and click a ready-made sample: a match, a mismatch, "
+                 "a blank field, a scan. Or upload your own.")
+    g[3].markdown("**4 · Break it yourself**")
+    g[3].caption("Open **🧪 Playground**, change a weight or a letter in a name, and watch SDOC catch it.")
+
+tab_dash, tab_out, tab_queue, tab_compare, tab_play, tab_inbox = st.tabs(
+    ["📊 Dashboard", "📤 Outbox", "🚩 Review queue", "🔍 Compare documents", "🧪 Playground", "📬 Inbox browser"])
 
 # ------------------------------------------------------------------ dashboard
 with tab_dash:
@@ -232,8 +262,12 @@ with tab_dash:
 
 # --------------------------------------------------------------------- outbox
 def _approve(idx):
-    st.session_state.outbox["plan"][idx]["delivery"] = report.DELIVERY_SENT
-    st.session_state.outbox["plan"][idx]["approved"] = True
+    item = st.session_state.outbox["plan"][idx]
+    edited = st.session_state.get(f"ob_body_{idx}", item["body"])
+    item["edited"] = edited != item["body"]
+    item["body"] = edited
+    item["delivery"] = report.DELIVERY_SENT
+    item["approved"] = True
 
 
 def _approve_all():
@@ -277,20 +311,24 @@ with tab_out:
         clickable_table([{"": icon[p["delivery"]], "Email": p["email_id"], "To": p["to"],
                           "Verdict": p["verdict"].replace("_", " "), "Delivery": p["delivery"],
                           "Subject": p["subject"][:70]} for _, p in shown],
-                        shown, "ob_table", "ob_pick")
+                        shown, f"ob_table_{view}_{n_sent}_{n_held}", "ob_pick", lambda t: t[0])
         st.download_button("⬇️ Outbox log (CSV)", report.outbox_csv(plan), "sdoc_outbox.csv")
         if shown:
-            idx, item = st.selectbox("Preview a message", shown, key="ob_pick",
-                                     format_func=lambda t: f"{t[1]['email_id']}: {t[1]['delivery']}")
+            idx, item = item_picker("Preview a message", shown, "ob_pick", lambda t: t[0],
+                                    lambda t: f"{t[1]['email_id']}: {t[1]['delivery']}")
             st.markdown(f"**To:** {item['to']}")
             st.markdown(f"**Subject:** {item['subject']}")
-            st.text_area("Message", item["body"], height=260, disabled=True, key=f"ob_body_{idx}")
+            can_edit = item["delivery"] in (report.DELIVERY_HELD, report.DELIVERY_HUMAN)
+            body_now = st.text_area("Message (you can edit it before approving)" if can_edit else "Message",
+                                    item["body"], height=260, disabled=not can_edit, key=f"ob_body_{idx}")
+            if item.get("edited"):
+                st.caption("✏️ Approved with your edits.")
             if item["delivery"] == report.DELIVERY_HELD:
                 st.button("✅ Approve (simulated send)", key=f"ob_ok_{idx}", on_click=_approve, args=(idx,))
             elif item["delivery"] == report.DELIVERY_HUMAN:
                 st.info("A person must resolve this case. The message above is only a starting point.")
                 st.link_button("✉️ Open in my email app",
-                               report.mailto_link(item["to"], item["subject"], item["body"]))
+                               report.mailto_link(item["to"], item["subject"], body_now))
 
 # --------------------------------------------------------------- review queue
 with tab_queue:
@@ -314,9 +352,9 @@ with tab_queue:
               "Reason / fields": (r["review_reason"] or "").replace("_", " ") if view == "Needs review"
               else ", ".join(report.FIELD_NAMES[f] for f in r["defect_fields"]),
               "Next step": report.NEXT_STEP.get(r["review_reason"], "Correct the flagged fields.")}
-             for r in items], items, "q_table", "q_pick")
-        pick = st.selectbox("Open a case", items, key="q_pick",
-                            format_func=lambda r: f"{r['email_id']}: {r['subject'][:70]}")
+             for r in items], items, f"q_table_{view}_{reason_filter}", "q_pick", lambda r: r["email_id"])
+        pick = item_picker("Open a case", items, "q_pick", lambda r: r["email_id"],
+                           lambda r: f"{r['email_id']}: {r['subject'][:70]}")
         email = Inbox(str(DATA_DIR)).get(pick["email_id"])
         show_case(f"q_{pick['email_id']}", pick["email_id"], pick["subject"], email.get("from"),
                   {"status": pick["status"], "review_reason": pick["review_reason"],
@@ -328,7 +366,13 @@ with tab_queue:
 with tab_compare:
     mode = st.radio("Mode", ["One pair", "Batch (many pairs)"], horizontal=True)
     if mode == "One pair":
-        st.write("Upload an SI and a draft BL (txt, pdf, docx or xlsx, up to 5 MB each).")
+        st.markdown("**Try a ready-made sample** (one click, no files needed):")
+        sc = st.columns(3)
+        for i, sm in enumerate(samples.SAMPLES):
+            if sc[i % 3].button(f"{sm['icon']} {sm['title']}", key=f"sm_{sm['id']}", help=sm["blurb"],
+                                width="stretch"):
+                st.session_state["sample_id"] = sm["id"]
+        st.write("Or upload an SI and a draft BL (txt, pdf, docx or xlsx, up to 5 MB each).")
         u1, u2 = st.columns(2)
         si_file = u1.file_uploader("Shipping Instruction (SI)", type=["txt", "pdf", "docx", "xlsx"])
         bl_file = u2.file_uploader("Draft Bill of Lading (BL)", type=["txt", "pdf", "docx", "xlsx"])
@@ -342,6 +386,17 @@ with tab_compare:
                         cross_check=cross_check)
                 show_case("upload", f"{si_file.name} vs {bl_file.name}", "Your documents", None,
                           result, report.field_rows(si_res, bl_res))
+        elif st.session_state.get("sample_id"):
+            sm = samples.BY_ID[st.session_state["sample_id"]]
+            si_b, si_n, bl_b, bl_n = samples.load(sm, DATA_DIR)
+            st.info(f"**Sample: {sm['title']}.** {sm['blurb']}")
+            d1, d2, d3 = st.columns([1, 1, 1])
+            d1.download_button("⬇️ Sample SI", si_b, si_n, key="sm_dl_si")
+            d2.download_button("⬇️ Sample BL", bl_b, bl_n, key="sm_dl_bl")
+            d3.button("✖ Clear sample", key="sm_clear", on_click=lambda: st.session_state.pop("sample_id", None))
+            result, si_res, bl_res = cached_compare(si_b, si_n, bl_b, bl_n, use_ai=use_ai,
+                                                    cross_check=cross_check)
+            show_case("sample", sm["title"], sm["title"], None, result, report.field_rows(si_res, bl_res))
     else:
         st.write("Drop many documents at once. Files are paired automatically by name: each pair "
                  "needs one file with a standalone **SI** and one with **BL** in its name "
@@ -377,15 +432,77 @@ with tab_compare:
                                       else report.REASONS.get(r["review_reason"], "") if r["status"] == "NEEDS_REVIEW"
                                       else "All 7 fields match")}
                          for k, r, _ in results]
-                clickable_table(table, results, "batch_table", "batch_pick")
+                clickable_table(table, results, f"batch_table_{len(results)}", "batch_pick", lambda t: t[0])
                 import csv, io
                 buf = io.StringIO()
                 w = csv.DictWriter(buf, fieldnames=["Pair", "Verdict", "Details"])
                 w.writeheader()
                 w.writerows(table)
                 st.download_button("⬇️ Batch results (CSV)", buf.getvalue(), "sdoc_batch_results.csv")
-                pick = st.selectbox("Open a pair", results, key="batch_pick", format_func=lambda t: t[0])
+                pick = item_picker("Open a pair", results, "batch_pick", lambda t: t[0], lambda t: t[0])
                 show_case(f"batch_{pick[0]}", pick[0], pick[0], None, pick[1], pick[2])
+
+# ------------------------------------------------------------------ playground
+PG_SAMPLES = [x for x in samples.SAMPLES if x["playground"]]
+
+
+def _pg_load():
+    sm = st.session_state.get("pg_sample") or PG_SAMPLES[0]
+    si_b, si_n, bl_b, bl_n = samples.load(sm, DATA_DIR)
+    si_res, bl_res = extract.extract(si_b, si_n), extract.extract(bl_b, bl_n)
+    for f in COMPARE_FIELDS:
+        st.session_state[f"pg_si_{f}"] = si_res.fields.get(f, "")
+        st.session_state[f"pg_bl_{f}"] = bl_res.fields.get(f, "")
+
+
+def _pg_set(field, value):
+    st.session_state[f"pg_bl_{field}"] = value
+
+
+def _pg_break(kind):
+    si = lambda f: st.session_state.get(f"pg_si_{f}", "")
+    if kind == "weight":
+        _pg_set("gross_weight_kg", report.tweak_weight(si("gross_weight_kg")))
+    elif kind == "typo":
+        _pg_set("consignee", report.tweak_typo(si("consignee")))
+    elif kind == "port":
+        _pg_set("port_of_discharge", "ROTTERDAM, NETHERLANDS (NLRTM)")
+    elif kind == "blank":
+        _pg_set("notify_party", "")
+    elif kind == "format":
+        digits = "".join(ch for ch in si("gross_weight_kg") if ch.isdigit())
+        if digits:
+            _pg_set("gross_weight_kg", f"{int(digits)}.00 KGS")
+
+
+with tab_play:
+    st.markdown("Pick a starting pair, then **change any value** on either document. "
+                "The real decision engine re-checks instantly, so you can see exactly what it catches "
+                "and what it lets through.")
+    st.selectbox("Start from", PG_SAMPLES, key="pg_sample", on_change=_pg_load,
+                 format_func=lambda x: f"{x['icon']} {x['title']}")
+    if "pg_bl_shipper" not in st.session_state:
+        _pg_load()
+    st.markdown("**Quick edits to the BL:**")
+    q = st.columns(6)
+    q[0].button("⚖️ Change the weight", key="pgb_w", on_click=_pg_break, args=("weight",), width="stretch")
+    q[1].button("🔤 Typo in consignee", key="pgb_t", on_click=_pg_break, args=("typo",), width="stretch")
+    q[2].button("🚢 Swap a port", key="pgb_p", on_click=_pg_break, args=("port",), width="stretch")
+    q[3].button("⬜ Blank a field", key="pgb_b", on_click=_pg_break, args=("blank",), width="stretch")
+    q[4].button("🔧 Reformat weight", key="pgb_f", on_click=_pg_break, args=("format",), width="stretch",
+                help="Writes the same weight a different way. It should still match.")
+    q[5].button("↩️ Reset", key="pgb_r", on_click=_pg_load, width="stretch")
+    left, right = st.columns(2)
+    left.markdown("##### Shipping Instruction")
+    right.markdown("##### Draft Bill of Lading")
+    for f in COMPARE_FIELDS:
+        left.text_input(report.FIELD_NAMES[f], key=f"pg_si_{f}")
+        right.text_input(report.FIELD_NAMES[f], key=f"pg_bl_{f}")
+    st.markdown("---")
+    pg_res, pg_rows = report.edited_result(
+        {f: st.session_state.get(f"pg_si_{f}", "") for f in COMPARE_FIELDS},
+        {f: st.session_state.get(f"pg_bl_{f}", "") for f in COMPARE_FIELDS})
+    show_case("pg", "Playground", "Playground", None, pg_res, pg_rows)
 
 # --------------------------------------------------------------- inbox browser
 with tab_inbox:
@@ -400,9 +517,9 @@ with tab_inbox:
     if shown:
         clickable_table([{"Email": r["email_id"], "Category": r["category"].replace("_", " ").title(),
                           "Verdict": r["status"].replace("_", " "), "Subject": r["subject"][:80]}
-                         for r in shown], shown, "ib_table", "ib_pick")
-        pick = st.selectbox("Pick an email", shown, key="ib_pick",
-                            format_func=lambda r: f"{r['email_id']}: {r['subject'][:80]}")
+                         for r in shown], shown, f"ib_table_{cat_sel}_{text_sel}", "ib_pick", lambda r: r["email_id"])
+        pick = item_picker("Pick an email", shown, "ib_pick", lambda r: r["email_id"],
+                           lambda r: f"{r['email_id']}: {r['subject'][:80]}")
         email = Inbox(str(DATA_DIR)).get(pick["email_id"])
         st.markdown(f"**Category:** `{pick['category']}`  ·  **From:** {email.get('from', '')}")
         st.text_area("Body", email.get("body", ""), height=180, disabled=True,

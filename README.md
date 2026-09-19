@@ -18,7 +18,8 @@ tell confidently.
 | `inbox/`, `attachments/` | The test dataset |
 | `app.py` | Web app (Streamlit): inbox dashboard, review queue, document comparison with a visual diff, draft replies |
 | `report.py` | Diffs, draft-reply emails, downloadable reports and inbox analytics used by the app |
-| `tests/` | Regression tests: `python tests/test_normalize.py`, `tests/test_report.py`, `tests/test_classify.py` |
+| `tests/` | Regression tests (`python tests/test_normalize.py`, `test_report.py`, `test_classify.py`, `test_samples.py`, `test_ai_features.py`) and optional real-browser tests (`browser_check.py`, `browser_features.py`) |
+| `samples.py` | The ready-made SI/BL pairs offered in the app |
 | `score_cli.py` | Scores a `submission.json` against a ground-truth file |
 | `packages.txt` | System packages (Tesseract, Poppler) installed on Streamlit Cloud |
 | `docs/` | Project description, slide outline and demo-video script |
@@ -67,6 +68,9 @@ compares the SI against the BL — writing results to `submission.json`.
   Nothing is actually sent, by design.
 - **AI second opinion** on escalated cases (advisory only; the verdict never changes) and optional **AI polish**
   of reply wording (rejected automatically if the AI changes a value or adds a number)
+- **Ready-made samples** (a match, mismatches in text/PDF/Excel, a blank field, a wrong document, a scan) and a
+  **Playground** where you edit any value and watch the real decision engine react
+- **Time-saved panel** with adjustable assumptions (an estimate, clearly labelled)
 - **Cross-check mode**: the AI and rule-based readers must agree on every field, or the case goes to a human
 
 ## Try it in the browser

@@ -202,6 +202,22 @@ def render(rows_all):
                      f"<div class='l'>{label}</div></div>", unsafe_allow_html=True)
     st.write("")
 
+    # ---- what this saves ---------------------------------------------------
+    _card_open("What this saves", "An estimate: move the sliders to match how long your team really takes")
+    v1, v2 = st.columns([1.2, 1])
+    with v1:
+        m_check = st.slider("Minutes to check one SI against its BL by hand", 1, 20, 5, key="vs_check")
+        m_reply = st.slider("Minutes to write the reply to the sender", 0, 10, 2, key="vs_reply")
+    saved = report.time_saved(rows_all, m_check, m_reply)
+    with v2:
+        st.markdown(f"<div class='sd-hero'>{saved['hours']:.1f} hours</div>"
+                    f"<div style='opacity:.8;margin:.3rem 0 .5rem'>of manual work handled automatically</div>"
+                    f"<div style='opacity:.75;font-size:.9rem'>{saved['checks']} SI vs BL checks decided and "
+                    f"answered on their own. The other {saved['escalated']} cases still go to a person, and "
+                    f"are not counted as saved.</div>", unsafe_allow_html=True)
+    st.caption("Estimate based on the assumptions above, not a measurement.")
+    st.write("")
+
     d1, d2, _ = st.columns([1, 1, 3])
     d1.download_button("⬇️ Results (CSV)", report.to_csv(rows_all), "sdoc_results.csv")
     d2.download_button("⬇️ submission.json", report.to_submission_json(rows_all), "submission.json")

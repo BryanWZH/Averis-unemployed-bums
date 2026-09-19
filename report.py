@@ -11,6 +11,7 @@ import re
 from urllib.parse import quote
 
 import classify
+import extract
 import pipeline
 from loader import Inbox
 from normalize import COMPARE_FIELDS, is_blank_value, normalize_value
@@ -295,3 +296,50 @@ def selection_change(selected_rows, last_rows):
     if selected_rows and list(selected_rows) != list(last_rows or []):
         return selected_rows[0]
     return None
+
+
+# ------------------------------------------------------- "break it yourself"
+def edited_result(si_values, bl_values):
+    """Run the real decision engine on hand-edited field values.
+    Each argument maps a field name to the text typed in the editor."""
+    def res(values):
+        r = extract.ExtractResult()
+        r.fields = {f: v for f, v in values.items() if f in COMPARE_FIELDS and v is not None}
+        return r
+    si_res, bl_res = res(si_values), res(bl_values)
+    return pipeline.decide_from_results(si_res, bl_res), field_rows(si_res, bl_res)
+
+
+def tweak_weight(value, delta=1000):
+    """'21,114 KG' -> '22,114 KG': a believable slip in a weight."""
+    digits = re.sub(r"[^0-9]", "", value or "")
+    return f"{int(digits) + delta:,} KG" if digits else value
+
+
+def tweak_typo(value):
+    """Change one letter in a name: 'AL GURQ LLC' -> 'AL GURR LLC'."""
+    v = value or ""
+    pos = 0
+    for word in v.split(" "):                      # prefer the last letter of the first real word
+        if len(word) >= 4 and word.isalpha() and word[-1].upper() != "Z":
+            i = pos + len(word) - 1
+            return v[:i] + chr(ord(v[i]) + 1) + v[i + 1:]
+        pos += len(word) + 1
+    for i in range(len(v) - 1, -1, -1):
+        if v[i].isalpha() and v[i].upper() != "Z":
+            return v[:i] + chr(ord(v[i]) + 1) + v[i + 1:]
+    return v
+
+
+# ------------------------------------------------------------ time saved
+def time_saved(rows_all, minutes_per_check=5.0, minutes_per_reply=2.0):
+    """Rough time an ops team saves: every SI vs BL check the system decides on
+    its own (and the reply it drafts) is one a person does not have to do.
+    Cases sent to a human are not counted as saved. An estimate that depends
+    entirely on the two assumptions passed in, not a measurement."""
+    decided = sum(1 for r in rows_all if r["category"] == "BL_COMPARISON" and r["rows"]
+                  and r["status"] in ("OK", "MISMATCH"))
+    escalated = sum(1 for r in rows_all if r["status"] == "NEEDS_REVIEW")
+    minutes = decided * (minutes_per_check + minutes_per_reply)
+    return {"checks": decided, "replies": decided, "escalated": escalated,
+            "minutes": minutes, "hours": minutes / 60.0}
