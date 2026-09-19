@@ -49,6 +49,13 @@ def test_mailto_link_is_prefilled_and_safe():
     assert "%0A" in url and "%26" in url and " " not in url
 
 
+def test_selection_change_only_fires_on_a_new_click():
+    assert report.selection_change([3], None) == 3          # first click
+    assert report.selection_change([3], [3]) is None        # same selection re-run: leave the dropdown alone
+    assert report.selection_change([5], [3]) == 5           # clicked another row
+    assert report.selection_change([], [3]) is None         # deselected
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

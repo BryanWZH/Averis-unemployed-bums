@@ -256,13 +256,21 @@ with tab_out:
                         horizontal=True)
         shown = [(i, p) for i, p in enumerate(plan) if view == "All" or p["delivery"] == view]
         icon = {report.DELIVERY_SENT: "📤", report.DELIVERY_HELD: "⏳", report.DELIVERY_HUMAN: "🧑"}
-        st.dataframe([{"": icon[p["delivery"]], "Email": p["email_id"], "To": p["to"],
-                       "Verdict": p["verdict"].replace("_", " "), "Delivery": p["delivery"],
-                       "Subject": p["subject"][:70]} for _, p in shown],
-                     hide_index=True, width="stretch")
+        ev = st.dataframe([{"": icon[p["delivery"]], "Email": p["email_id"], "To": p["to"],
+                            "Verdict": p["verdict"].replace("_", " "), "Delivery": p["delivery"],
+                            "Subject": p["subject"][:70]} for _, p in shown],
+                          hide_index=True, width="stretch", on_select="rerun",
+                          selection_mode="single-row", key="ob_table")
+        clicked = report.selection_change(ev.selection.rows, st.session_state.get("ob_last_sel"))
+        st.session_state["ob_last_sel"] = list(ev.selection.rows)
+        if clicked is not None and clicked < len(shown):
+            st.session_state["ob_pick"] = shown[clicked]
+        if st.session_state.get("ob_pick") not in shown:
+            st.session_state.pop("ob_pick", None)
+        st.caption("Click a row to preview its message.")
         st.download_button("⬇️ Outbox log (CSV)", report.outbox_csv(plan), "sdoc_outbox.csv")
         if shown:
-            idx, item = st.selectbox("Preview a message", shown,
+            idx, item = st.selectbox("Preview a message", shown, key="ob_pick",
                                      format_func=lambda t: f"{t[1]['email_id']}: {t[1]['delivery']}")
             st.markdown(f"**To:** {item['to']}")
             st.markdown(f"**Subject:** {item['subject']}")
@@ -291,13 +299,21 @@ with tab_queue:
                                        format_func=lambda x: x.replace("_", " "))
         items = [r for r in items if r["review_reason"] in reason_filter]
     if items:
-        st.dataframe(
+        qev = st.dataframe(
             [{"Email": r["email_id"], "Subject": r["subject"][:70],
               "Reason / fields": (r["review_reason"] or "").replace("_", " ") if view == "Needs review"
               else ", ".join(report.FIELD_NAMES[f] for f in r["defect_fields"]),
               "Next step": report.NEXT_STEP.get(r["review_reason"], "Correct the flagged fields.")}
-             for r in items], hide_index=True, width="stretch")
-        pick = st.selectbox("Open a case", items,
+             for r in items], hide_index=True, width="stretch", on_select="rerun",
+            selection_mode="single-row", key="q_table")
+        q_clicked = report.selection_change(qev.selection.rows, st.session_state.get("q_last_sel"))
+        st.session_state["q_last_sel"] = list(qev.selection.rows)
+        if q_clicked is not None and q_clicked < len(items):
+            st.session_state["q_pick"] = items[q_clicked]
+        if st.session_state.get("q_pick") not in items:
+            st.session_state.pop("q_pick", None)
+        st.caption("Click a row to open that case.")
+        pick = st.selectbox("Open a case", items, key="q_pick",
                             format_func=lambda r: f"{r['email_id']}: {r['subject'][:70]}")
         email = Inbox(str(DATA_DIR)).get(pick["email_id"])
         show_case(f"q_{pick['email_id']}", pick["email_id"], pick["subject"], email.get("from"),

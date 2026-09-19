@@ -287,3 +287,11 @@ def outbox_csv(plan):
     for p in plan:
         w.writerow([p["email_id"], p["to"], p["verdict"], p["delivery"], p["subject"]])
     return buf.getvalue()
+
+
+def selection_change(selected_rows, last_rows):
+    """Row the user just clicked in a table, or None if the selection is unchanged.
+    Lets a click drive a dropdown without overriding the dropdown afterwards."""
+    if selected_rows and list(selected_rows) != list(last_rows or []):
+        return selected_rows[0]
+    return None
