@@ -68,7 +68,7 @@ html, body, .stApp, .stApp p, .stApp li, .stApp label, .stApp h1, .stApp h2, .st
    radial-gradient(1000px 420px at 92% -8%, var(--glow), transparent 60%),
    radial-gradient(700px 380px at -6% 8%, var(--soft), transparent 60%), var(--bg);}
 header[data-testid="stHeader"] {background:transparent;}
-#MainMenu, footer {visibility:hidden;}
+footer {visibility:hidden;}
 .block-container {padding-top:1.4rem; padding-bottom:3rem; max-width:1240px;}
 h1,h2,h3 {letter-spacing:-.02em; font-weight:700;}
 
