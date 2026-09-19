@@ -68,6 +68,17 @@ def decide_comparison(email, inbox):
     return result
 
 
+def _read(reader, data, name, use_ai):
+    """Read one document. Whatever reader is used, a PDF with no text layer
+    (an image-only scan) must be escalated to a human, not decided, so that
+    check always comes from the deterministic reader."""
+    if use_ai and name.lower().endswith(".pdf"):
+        gate = extract.extract(data, name)
+        if not gate.readable:
+            return gate
+    return reader(data, name)
+
+
 def compare_documents(si_bytes, si_name, bl_bytes, bl_name, use_ai=None):
     """Read an SI and a draft BL and compare the 7 fields.
 
@@ -77,8 +88,8 @@ def compare_documents(si_bytes, si_name, bl_bytes, bl_name, use_ai=None):
     if use_ai is None:
         use_ai = ai_extract.available()
     reader = ai_extract.ai_extract if use_ai else extract.extract
-    si_res = reader(si_bytes, si_name)
-    bl_res = reader(bl_bytes, bl_name)
+    si_res = _read(reader, si_bytes, si_name, use_ai)
+    bl_res = _read(reader, bl_bytes, bl_name, use_ai)
 
     if not si_res.readable or not bl_res.readable:
         return _empty_result("NEEDS_REVIEW", "unreadable"), si_res, bl_res

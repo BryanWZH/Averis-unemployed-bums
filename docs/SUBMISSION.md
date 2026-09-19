@@ -60,8 +60,8 @@ Record with any screen recorder, upload to YouTube as **Unlisted** or Public
 
 ## 4. Submission checklist
 
-- [ ] Public GitHub repo: [link]
-- [ ] Live deployed app: [link]
+- [x] Public GitHub repo: https://github.com/isaaclew1102-web/Averis-unemployed-bums
+- [ ] Live deployed app (must open WITHOUT signing in): https://averis-unemployed-bums-yw82lbdvxstupvjeosomwc.streamlit.app/
 - [ ] Demo video (YouTube, unlisted/public, max 5 min): [link]
 - [ ] Slide deck / documentation
 - [ ] Project description (section 1)
