@@ -55,8 +55,7 @@ MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 STATUS_LABEL = {"OK": "OK", "MISMATCH": "MISMATCH", "NEEDS_REVIEW": "NEEDS REVIEW"}
 
 st.set_page_config(page_title="SDOC Verification", page_icon="🚢", layout="wide")
-DARK = style.is_dark()
-st.markdown(style.css(DARK), unsafe_allow_html=True)
+st.markdown(style.css(), unsafe_allow_html=True)
 
 
 def _secret(name):
@@ -76,7 +75,7 @@ ai_ready = ai_extract.available() and bool(access_code)
 use_ai = False
 cross_check = False
 with st.sidebar:
-    components.html(style.theme_switch_html(DARK), height=42)
+    components.html(style.theme_switch_html(), height=42)
 st.sidebar.header("Reader")
 if ai_ready:
     entered = st.sidebar.text_input("AI access code", type="password",
@@ -106,9 +105,8 @@ def load_analysis():
 
 
 def badge(status):
-    fg, bg = style.STATUS["dark" if DARK else "light"].get(status, ("#777", "rgba(128,128,128,.15)"))
-    label = STATUS_LABEL.get(status, status)
-    st.markdown(f"<span class='sdoc-badge' style='color:{fg};background:{bg}'>{label}</span>",
+    cls = {"OK": "ok", "MISMATCH": "bad", "NEEDS_REVIEW": "warn"}.get(status, "")
+    st.markdown(f"<span class='sdoc-badge {cls}'>{STATUS_LABEL.get(status, status)}</span>",
                 unsafe_allow_html=True)
 
 

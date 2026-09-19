@@ -38,10 +38,9 @@ REASON_LABEL = {
 
 
 def _is_dark():
-    try:
-        return st.context.theme.type == "dark"
-    except Exception:
-        return False
+    """The chart colours below are the mid-brightness set that reads well on both the cream and the
+    navy theme, so charts never depend on guessing the visitor's theme."""
+    return True
 
 
 def _tile(value, label, accent):

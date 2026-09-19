@@ -10,40 +10,22 @@ PALETTE = {
     "light": {
         "bg": "#FAF3E8", "card": "#FFFBF4", "soft": "rgba(120,84,30,.075)", "line": "rgba(120,84,30,.20)",
         "ink": "#2E2417", "ink2": "rgba(46,36,23,.68)", "brand": "#0F766E", "brand2": "#C2571A",
-        "shadow": "0 1px 2px rgba(90,60,20,.07), 0 10px 28px rgba(90,60,20,.08)",
-        "hero": "linear-gradient(120deg,#0B5D63 0%,#0F766E 48%,#D98E3F 135%)",
-        "glow": "rgba(217,142,63,.35)", "side": "#F3E8D4", "tab_on": "#0F766E", "onbrand": "#FFFFFF",
+        "h1": "#0B5D63", "h2": "#0F766E", "h3": "#D98E3F",
+        "glow": "rgba(217,142,63,.35)", "sh1": "rgba(90,60,20,.07)", "sh2": "rgba(90,60,20,.10)", "side": "#F3E8D4", "tab_on": "#0F766E", "onbrand": "#FFFFFF",
     },
     "dark": {
         "bg": "#0A1120", "card": "#111B30", "soft": "rgba(148,180,255,.07)", "line": "rgba(148,180,255,.16)",
         "ink": "#E7EDF6", "ink2": "rgba(231,237,246,.66)", "brand": "#2DD4BF", "brand2": "#F59E5B",
-        "shadow": "0 1px 2px rgba(0,0,0,.4), 0 14px 34px rgba(0,0,0,.42)",
-        "hero": "linear-gradient(120deg,#0E2A47 0%,#0B4A5A 52%,#0F766E 135%)",
-        "glow": "rgba(45,212,191,.28)", "side": "#0D1628", "tab_on": "#2DD4BF", "onbrand": "#052B29",
+        "h1": "#0E2A47", "h2": "#0B4A5A", "h3": "#0F766E",
+        "glow": "rgba(45,212,191,.28)", "sh1": "rgba(0,0,0,.40)", "sh2": "rgba(0,0,0,.42)", "side": "#0D1628", "tab_on": "#2DD4BF", "onbrand": "#052B29",
     },
 }
 
-# status colours: readable text colour + translucent tint, per theme
-STATUS = {
-    "light": {"OK": ("#177A4B", "rgba(23,122,75,.14)"), "MISMATCH": ("#B3261E", "rgba(179,38,30,.13)"),
-              "NEEDS_REVIEW": ("#A2650A", "rgba(217,142,10,.18)")},
-    "dark": {"OK": ("#4ADE9B", "rgba(74,222,155,.16)"), "MISMATCH": ("#FF8A80", "rgba(255,138,128,.16)"),
-             "NEEDS_REVIEW": ("#FFC24D", "rgba(255,194,77,.16)")},
-}
-
-
-def is_dark():
-    """True when the visitor is looking at Streamlit's dark theme."""
-    try:
-        import streamlit as st
-        return st.context.theme.type == "dark"
-    except Exception:
-        return False
-
-
-def css(dark):
-    p = PALETTE["dark" if dark else "light"]
-    v = ";".join(f"--{k}:{val}" for k, val in p.items())
+def css():
+    """Variables are set on .stApp, where Streamlit records the ACTIVE theme in `color-scheme`,
+    so light-dark() always follows what the visitor actually sees (no guessing in Python)."""
+    lt, dk = PALETTE["light"], PALETTE["dark"]
+    v = ";".join(f"--{k}:light-dark({lt[k]},{dk[k]})" for k in lt)
     return "<style>" + _RULES.replace("@@VARS@@", v) + "</style>"
 
 
@@ -61,7 +43,7 @@ def hero(reader_label, ai_on):
 
 _RULES = """
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-:root{@@VARS@@}
+.stApp{@@VARS@@}
 html, body, .stApp, .stApp p, .stApp li, .stApp label, .stApp h1, .stApp h2, .stApp h3, .stApp h4,
 .stApp button, .stApp input, .stApp textarea, .stApp table {font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;}
 .stApp {background:
@@ -73,8 +55,8 @@ footer {visibility:hidden;}
 h1,h2,h3 {letter-spacing:-.02em; font-weight:700;}
 
 /* ---- header banner ---- */
-.sd-top {background:var(--hero); color:#fff; border-radius:22px; padding:1.5rem 1.7rem 1.35rem;
-         box-shadow:var(--shadow); position:relative; overflow:hidden; margin-bottom:1.1rem;}
+.sd-top {background:linear-gradient(120deg,var(--h1) 0%,var(--h2) 52%,var(--h3) 135%); color:#fff; border-radius:22px; padding:1.5rem 1.7rem 1.35rem;
+         box-shadow:0 1px 2px var(--sh1),0 12px 30px var(--sh2); position:relative; overflow:hidden; margin-bottom:1.1rem;}
 .sd-top:after {content:""; position:absolute; right:-70px; top:-90px; width:300px; height:300px; border-radius:50%;
                background:radial-gradient(circle, rgba(255,255,255,.20), transparent 68%);}
 .sd-top-l {display:flex; align-items:center; gap:.9rem;}
@@ -103,12 +85,12 @@ h1,h2,h3 {letter-spacing:-.02em; font-weight:700;}
 
 /* ---- cards (bordered containers) ---- */
 [data-testid="stVerticalBlockBorderWrapper"]:has(> div > [data-testid="stVerticalBlock"] .sd-cardhead) {
-   background:var(--card); border:1px solid var(--line); border-radius:18px; box-shadow:var(--shadow);
+   background:var(--card); border:1px solid var(--line); border-radius:18px; box-shadow:0 1px 2px var(--sh1),0 12px 30px var(--sh2);
    padding:.35rem .5rem .2rem;}
 .sd-cardhead .ttl {font-size:1.08rem; font-weight:700; letter-spacing:-.01em;}
 .sd-cardhead .sub {font-size:.85rem; color:var(--ink2); margin:.1rem 0 .5rem;}
 [data-testid="stExpander"] {border:1px solid var(--line) !important; border-radius:14px !important;
-                            background:var(--card); box-shadow:var(--shadow); overflow:hidden;}
+                            background:var(--card); box-shadow:0 1px 2px var(--sh1),0 12px 30px var(--sh2); overflow:hidden;}
 [data-testid="stExpander"] summary {font-weight:600;}
 [data-testid="stAlert"] {border-radius:14px; border:1px solid var(--line);}
 [data-testid="stDataFrame"] {border-radius:14px; overflow:hidden; border:1px solid var(--line);}
@@ -118,7 +100,7 @@ h1,h2,h3 {letter-spacing:-.02em; font-weight:700;}
    border-radius:12px; font-weight:600; border:1px solid var(--line); background:var(--card);
    transition:transform .12s ease, border-color .12s ease, box-shadow .12s ease;}
 .stButton > button:hover, .stDownloadButton > button:hover {
-   border-color:var(--brand); color:var(--brand); transform:translateY(-1px); box-shadow:var(--shadow);}
+   border-color:var(--brand); color:var(--brand); transform:translateY(-1px); box-shadow:0 1px 2px var(--sh1),0 12px 30px var(--sh2);}
 button[kind="primary"], [data-testid="stBaseButton-primary"] {
    background:linear-gradient(120deg,var(--brand),var(--brand2)) !important; color:var(--onbrand) !important;
    border:none !important; border-radius:12px; font-weight:700;}
@@ -127,7 +109,7 @@ button[kind="primary"], [data-testid="stBaseButton-primary"] {
 
 /* ---- tiles, tables ---- */
 .sd-tile {border-radius:18px; padding:1.05rem 1.25rem; background:var(--card); border:1px solid var(--line);
-          box-shadow:var(--shadow); position:relative; overflow:hidden; height:100%;}
+          box-shadow:0 1px 2px var(--sh1),0 12px 30px var(--sh2); position:relative; overflow:hidden; height:100%;}
 .sd-tile:before {content:""; position:absolute; left:0; top:0; bottom:0; width:5px; background:var(--accent);}
 .sd-tile .v {font-size:2.6rem; font-weight:800; line-height:1.05; letter-spacing:-.03em;}
 .sd-tile .l {font-size:.9rem; color:var(--ink2); margin-top:.2rem;}
@@ -142,10 +124,13 @@ button[kind="primary"], [data-testid="stBaseButton-primary"] {
 .sd-mini .l {font-size:.85rem; color:var(--ink2);}
 .sdoc-badge {display:inline-block; padding:.4rem 1rem; border-radius:999px; font-weight:800; font-size:1.05rem;
              letter-spacing:.03em; border:1px solid currentColor;}
+.sdoc-badge.ok {color:color-mix(in srgb,#16A34A 62%,currentColor); background:rgba(22,163,74,.15);}
+.sdoc-badge.bad {color:color-mix(in srgb,#DC2626 62%,currentColor); background:rgba(220,38,38,.14);}
+.sdoc-badge.warn {color:color-mix(in srgb,#D97706 62%,currentColor); background:rgba(245,158,11,.17);}
 .sdoc-diff {font-family: ui-monospace, Menlo, Consolas, monospace; font-size:.95rem;}
 .sd-tblwrap {overflow-x:auto; margin:.4rem 0 1rem;}
 .sd-tbl, .sd-kv {width:100%; border-collapse:separate; border-spacing:0; background:var(--card);
-                 border:1px solid var(--line); border-radius:14px; overflow:hidden; box-shadow:var(--shadow);}
+                 border:1px solid var(--line); border-radius:14px; overflow:hidden; box-shadow:0 1px 2px var(--sh1),0 12px 30px var(--sh2);}
 .sd-tbl th {text-align:left; padding:.65rem .9rem; font-size:.74rem; text-transform:uppercase;
             letter-spacing:.07em; color:var(--ink2); background:var(--soft);}
 .sd-tbl td, .sd-kv td {padding:.65rem .9rem; border-top:1px solid var(--line); vertical-align:top; word-break:break-word;}
@@ -166,17 +151,18 @@ button[kind="primary"], [data-testid="stBaseButton-primary"] {
 """
 
 
-def theme_switch_html(dark):
+def theme_switch_html():
     """A small Light/Dark button. Streamlit has no official call to change theme, but it remembers
     the visitor's choice in the browser under 'stActiveTheme-<path>-v2', so the button writes that
-    and reloads the page. If the browser blocks it the button simply does nothing."""
-    target, label = ("Light", "☀️  Switch to light") if dark else ("Dark", "🌙  Switch to dark")
-    ink, line = ("#E7EDF6", "rgba(148,180,255,.35)") if dark else ("#2E2417", "rgba(120,84,30,.35)")
+    and reloads. It reads the ACTIVE theme from the page itself, so its label is always right."""
     return ("<style>html,body{margin:0;background:transparent;overflow:hidden}"
-            "button{font:600 14px Inter,system-ui,sans-serif;color:%s;background:transparent;cursor:pointer;"
-            "border:1px solid %s;border-radius:999px;padding:7px 16px;float:left}"
-            "button:hover{border-color:#0F766E;color:#0F766E}</style>"
-            "<button id='b'>%s</button><script>"
-            "document.getElementById('b').onclick=function(){try{var p=window.parent;"
-            "p.localStorage.setItem('stActiveTheme-'+p.location.pathname+'-v2',JSON.stringify('%s'));"
-            "p.location.reload();}catch(e){}};</script>" % (ink, line, label, target))
+            "button{font:600 14px Inter,system-ui,sans-serif;background:transparent;cursor:pointer;"
+            "border-radius:999px;padding:7px 16px;float:left;border:1px solid}"
+            "button:hover{border-color:#0F9F94 !important;color:#0F9F94 !important}</style>"
+            "<button id='b'>...</button><script>"
+            "var p=window.parent,b=document.getElementById('b'),app=p.document.querySelector('.stApp');"
+            "var dark=p.getComputedStyle(app).colorScheme==='dark';"
+            "var ink=p.getComputedStyle(app).color;b.style.color=ink;b.style.borderColor=ink.replace('rgb','rgba').replace(')',',.35)');"
+            "b.textContent=dark?'☀️  Switch to light':'🌙  Switch to dark';"
+            "b.onclick=function(){try{p.localStorage.setItem('stActiveTheme-'+p.location.pathname+'-v2',"
+            "JSON.stringify(dark?'Light':'Dark'));p.location.reload();}catch(e){}};</script>")
