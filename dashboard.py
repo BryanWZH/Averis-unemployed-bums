@@ -154,7 +154,7 @@ def render(rows_all):
         _card_open("From inbox to verdict", "How many emails reach each stage")
         stages = [("Emails received", s["total"]), ("Need a comparison", len(comp)),
                   ("Decided automatically", decided), ("Defects caught", mis)]
-        df = pd.DataFrame([{"label": f"{i + 1}  {n}", "value": v, "color": FUNNEL_BLUES[i]}
+        df = pd.DataFrame([{"label": n, "value": v, "color": FUNNEL_BLUES[i]}
                            for i, (n, v) in enumerate(stages)])
         df["axis"] = df["label"] + "   " + df["value"].astype(str)
         chart = (alt.Chart(df).mark_bar(cornerRadiusEnd=6, size=34)
