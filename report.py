@@ -43,8 +43,11 @@ def field_rows(si_res, bl_res):
             verdict = "blank"
         else:
             verdict = "match" if normalize_value(f, sv) == normalize_value(f, bv) else "mismatch"
+        blank = verdict == "blank"
         rows.append({"field": f, "label": FIELD_NAMES[f], "si": sv or "", "bl": bv or "",
-                     "verdict": verdict})
+                     "verdict": verdict,
+                     "si_norm": None if blank else normalize_value(f, sv),
+                     "bl_norm": None if blank else normalize_value(f, bv)})
     return rows
 
 
@@ -161,3 +164,61 @@ def to_submission_json(rows):
         "category": r["category"], "status": r["status"],
         "review_reason": r["review_reason"], "has_defect": r["status"] == "MISMATCH",
         "defect_fields": r["defect_fields"]} for r in rows}, indent=2)
+
+
+# ---------------------------------------------------------------- audit trail
+RULES = {
+    "shipper": "company name only (first line, address dropped), upper-cased, spaces collapsed",
+    "consignee": "company name only (first line, address dropped), upper-cased, spaces collapsed",
+    "notify_party": "company name only (first line, address dropped), upper-cased, spaces collapsed",
+    "port_of_loading": "port text as printed, trailing (CODE) dropped, upper-cased",
+    "port_of_discharge": "port text as printed, trailing (CODE) dropped, upper-cased",
+    "container_count": "number of containers (from '3 x 40HC', '03', '40HC x 3'), leading zeros ignored",
+    "gross_weight_kg": "converted to kilograms (handles 61,026.00 / 61.026,00 / MT / LBS)",
+}
+
+
+def audit_rows(rows):
+    """Why each field got its verdict: raw text, normalised value and the rule
+    that produced it. Makes every decision traceable."""
+    out = []
+    for r in rows:
+        if r["verdict"] == "blank":
+            decision = "Blank or placeholder on one side: escalated, never guessed"
+        elif r["verdict"] == "match":
+            decision = "Normalised values are identical"
+        else:
+            decision = "Normalised values differ: flagged as a defect"
+        out.append({"Field": r["label"], "SI (as read)": r["si"] or "—", "BL (as read)": r["bl"] or "—",
+                    "SI (normalised)": r.get("si_norm") or "—", "BL (normalised)": r.get("bl_norm") or "—",
+                    "Rule applied": RULES[r["field"]], "Decision": decision})
+    return out
+
+
+# ------------------------------------------------------------------- batch
+_ROLE_RE = re.compile(r"(?<![a-z0-9])(si|bl)(?![a-z0-9])", re.I)
+
+
+def pair_documents(names):
+    """Pair uploaded file names into (key, si_name, bl_name).
+
+    A name is an SI or BL if it contains a standalone 'SI' or 'BL' token
+    (email_004_SI.txt, 'ABC - BL.pdf'); the rest of the name is the pair key.
+    Returns (pairs, unpaired_names)."""
+    slots = {}
+    unpaired = []
+    for n in names:
+        stem = n.rsplit(".", 1)[0]
+        m = _ROLE_RE.search(stem)
+        if not m:
+            unpaired.append(n)
+            continue
+        key = re.sub(r"[\s_\-]+", " ", (stem[:m.start()] + " " + stem[m.end():])).strip().lower()
+        slots.setdefault(key, {})[m.group(1).upper()] = n
+    pairs = []
+    for key, d in sorted(slots.items()):
+        if "SI" in d and "BL" in d:
+            pairs.append((key, d["SI"], d["BL"]))
+        else:
+            unpaired.extend(d.values())
+    return pairs, unpaired

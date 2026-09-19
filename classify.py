@@ -20,14 +20,16 @@ CATEGORIES = ["BL_COMPARISON", "SI_REQUEST", "INVOICE_QUERY", "GENERAL", "SPAM"]
 SUBJECT_KW = {
     "BL_COMPARISON": [
         "to confirm docs", "request bl draft", "amend bl", "draft bl",
-        "bill of lading",
+        "bill of lading", "bl draft", "bl vs", "vs si", "compare",
     ],
     "SI_REQUEST": [
         "cust si", "request si", "si needed", "latest si",
+        "shipping instruction", "need si", "si outstanding",
     ],
     "INVOICE_QUERY": [
         "billing", "missing gr", "cancel invoice", "local charges",
         "d & d", "d&d charges", "total freight",
+        "invoice", "overdue", "demurrage", "detention",
     ],
     "GENERAL": [
         "update summary", "berthing report", "reminder", "rpa_",
@@ -49,6 +51,7 @@ BODY_KW = {
     "SI_REQUEST": [
         "shipping instruction", "documents required", "packing list\n",
         "please revert with draft bl once available",
+        "have not received the si", "send the si", "submit your shipping instruction",
     ],
     "INVOICE_QUERY": [
         "invoice", "gr is still missing", "reverse the pgi",
@@ -63,7 +66,8 @@ BODY_KW = {
         "congratulations", "claim your", "customs fee", "confirm payment",
         "verify your account", "avoid deactivation", "avoid suspension",
         "bank details", "bitcoin", "guaranteed", "singles", "survey",
-        "click here" ,"limited time offer",
+        "click here" ,"limited time offer", "password", "bank login",
+        "log in to", "login", "discount",
     ],
 }
 
@@ -71,6 +75,12 @@ BODY_KW = {
 CARRIER_CODE_PAREN = re.compile(
     r"\b(MSC|CMA|HAPAG|OOCL|EVER|ONE|YM|PIL|MONTER)\(", re.I)
 SI_TOKEN = re.compile(r"(^|[\s_\-])SI([\s_\-]|$)", re.I)
+
+# Phrases that almost only appear in scams; strong enough to outweigh
+# ordinary business vocabulary (e.g. a phishing mail that mentions "invoice").
+SPAM_STRONG = ["password", "bank login", "verify your account", "you have won",
+               "claim your prize", "gift card", "bitcoin", "confirm your password",
+               "bank details", "business proposal"]
 
 PRIORITY = ["SPAM", "INVOICE_QUERY", "SI_REQUEST", "BL_COMPARISON", "GENERAL"]
 
@@ -98,10 +108,15 @@ def classify(email, has_attachments):
     for c, s in _score(body, BODY_KW, 1).items():
         scores[c] += s
 
+    text_low = (subject + " " + body).lower()
+    if any(p in text_low for p in SPAM_STRONG):
+        scores["SPAM"] += 6
+
     if CARRIER_CODE_PAREN.search(subject):
         scores["BL_COMPARISON"] += 5
     is_reminder_style = "submit" in subject.lower() or "reminder" in subject.lower()
-    if SI_TOKEN.search(subject) and not is_reminder_style:
+    mentions_bl = re.search(r"(^|[\s_\-])BL([\s_\-]|$)", subject, re.I) or "draft bl" in subject.lower()
+    if SI_TOKEN.search(subject) and not is_reminder_style and not mentions_bl:
         scores["SI_REQUEST"] += 5
         # "SI -" style subjects can also contain a carrier code in parens
         # e.g. "SI - <bl> - DIRECT(MSC) - ..."; don't let that outweigh

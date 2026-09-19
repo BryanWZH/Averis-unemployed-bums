@@ -18,7 +18,7 @@ tell confidently.
 | `inbox/`, `attachments/` | The test dataset |
 | `app.py` | Web app (Streamlit): inbox dashboard, review queue, document comparison with a visual diff, draft replies |
 | `report.py` | Diffs, draft-reply emails, downloadable reports and inbox analytics used by the app |
-| `tests/` | Regression tests (`python tests/test_normalize.py`, `python tests/test_report.py`) |
+| `tests/` | Regression tests: `python tests/test_normalize.py`, `tests/test_report.py`, `tests/test_classify.py` |
 | `score_cli.py` | Scores a `submission.json` against a ground-truth file |
 | `packages.txt` | System packages (Tesseract, Poppler) installed on Streamlit Cloud |
 | `docs/` | Project description, slide outline and demo-video script |
@@ -53,6 +53,15 @@ python3 pipeline.py . submission.json
 
 This reads every email in `inbox/`, classifies it, and for comparison emails,
 compares the SI against the BL — writing results to `submission.json`.
+
+## Features
+
+- **Dashboard** of the whole inbox: outcomes, most common defects, reasons for escalation, CSV / `submission.json` export
+- **Review queue** of every case that needs a human, with the reason and next step
+- **Visual diff** highlighting the exact characters that differ between SI and BL
+- **Audit trail** per field: value as read, normalised value, rule applied
+- **Draft reply** to the sender, and a downloadable Markdown report per case
+- **Batch mode**: upload many SI/BL files at once, auto-paired by file name
 
 ## Try it in the browser
 

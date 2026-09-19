@@ -119,6 +119,12 @@ def show_case(key, title, subject, sender, result, rows):
                 c3.markdown(f"<div class='sdoc-diff'>{r['bl'] or '—'}</div>", unsafe_allow_html=True)
                 c4.markdown("✅" if r["verdict"] == "match" else "⚠️")
 
+    if rows:
+        with st.expander("🔎 Audit trail: how each field was decided"):
+            st.caption("Every verdict comes from these normalised values and rules, made by plain code, "
+                       "not by a model's judgment.")
+            st.dataframe(report.audit_rows(rows), hide_index=True, width="stretch")
+
     if result["status"] != "OK" or rows:
         with st.expander("✉️ Draft reply to the sender", expanded=result["status"] != "OK"):
             first = (sender or "").split("@")[0].replace(".", " ").replace("_", " ").title() or None
@@ -201,19 +207,65 @@ with tab_queue:
 
 # ------------------------------------------------------------ compare uploads
 with tab_compare:
-    st.write("Upload an SI and a draft BL (txt, pdf, docx or xlsx, up to 5 MB each).")
-    u1, u2 = st.columns(2)
-    si_file = u1.file_uploader("Shipping Instruction (SI)", type=["txt", "pdf", "docx", "xlsx"])
-    bl_file = u2.file_uploader("Draft Bill of Lading (BL)", type=["txt", "pdf", "docx", "xlsx"])
-    if si_file and bl_file:
-        if si_file.size > MAX_UPLOAD_BYTES or bl_file.size > MAX_UPLOAD_BYTES:
-            st.error("Files must be 5 MB or smaller.")
-        else:
-            with st.spinner("Reading and comparing..."):
-                result, si_res, bl_res = pipeline.compare_documents(
-                    si_file.getvalue(), si_file.name, bl_file.getvalue(), bl_file.name, use_ai=use_ai)
-            show_case("upload", f"{si_file.name} vs {bl_file.name}", "Your documents", None,
-                      result, report.field_rows(si_res, bl_res))
+    mode = st.radio("Mode", ["One pair", "Batch (many pairs)"], horizontal=True)
+    if mode == "One pair":
+        st.write("Upload an SI and a draft BL (txt, pdf, docx or xlsx, up to 5 MB each).")
+        u1, u2 = st.columns(2)
+        si_file = u1.file_uploader("Shipping Instruction (SI)", type=["txt", "pdf", "docx", "xlsx"])
+        bl_file = u2.file_uploader("Draft Bill of Lading (BL)", type=["txt", "pdf", "docx", "xlsx"])
+        if si_file and bl_file:
+            if si_file.size > MAX_UPLOAD_BYTES or bl_file.size > MAX_UPLOAD_BYTES:
+                st.error("Files must be 5 MB or smaller.")
+            else:
+                with st.spinner("Reading and comparing..."):
+                    result, si_res, bl_res = pipeline.compare_documents(
+                        si_file.getvalue(), si_file.name, bl_file.getvalue(), bl_file.name, use_ai=use_ai)
+                show_case("upload", f"{si_file.name} vs {bl_file.name}", "Your documents", None,
+                          result, report.field_rows(si_res, bl_res))
+    else:
+        st.write("Drop many documents at once. Files are paired automatically by name: each pair "
+                 "needs one file with a standalone **SI** and one with **BL** in its name "
+                 "(for example `PO123_SI.pdf` and `PO123_BL.pdf`).")
+        files = st.file_uploader("SI and BL files", type=["txt", "pdf", "docx", "xlsx"],
+                                 accept_multiple_files=True, key="batch_files")
+        if files:
+            by_name = {f.name: f for f in files}
+            pairs, unpaired = report.pair_documents(list(by_name))
+            if unpaired:
+                st.warning("Could not pair: " + ", ".join(unpaired))
+            results = []
+            for key, si_name, bl_name in pairs[:50]:
+                si_f, bl_f = by_name[si_name], by_name[bl_name]
+                if si_f.size > MAX_UPLOAD_BYTES or bl_f.size > MAX_UPLOAD_BYTES:
+                    results.append((key, {"status": "NEEDS_REVIEW", "review_reason": "unreadable",
+                                          "defect_fields": []}, []))
+                    continue
+                res, si_res, bl_res = pipeline.compare_documents(
+                    si_f.getvalue(), si_name, bl_f.getvalue(), bl_name, use_ai=use_ai)
+                results.append((key, res, report.field_rows(si_res, bl_res)))
+            if len(pairs) > 50:
+                st.info("Showing the first 50 pairs.")
+            if results:
+                counts = {k: sum(r["status"] == k for _, r, _ in results) for k in STATUS_STYLE}
+                m1, m2, m3 = st.columns(3)
+                m1.metric("OK", counts["OK"])
+                m2.metric("Mismatch", counts["MISMATCH"])
+                m3.metric("Needs review", counts["NEEDS_REVIEW"])
+                table = [{"Pair": k, "Verdict": STATUS_STYLE[r["status"]][2],
+                          "Details": (", ".join(report.FIELD_NAMES[f] for f in r["defect_fields"])
+                                      if r["status"] == "MISMATCH"
+                                      else report.REASONS.get(r["review_reason"], "") if r["status"] == "NEEDS_REVIEW"
+                                      else "All 7 fields match")}
+                         for k, r, _ in results]
+                st.dataframe(table, hide_index=True, width="stretch")
+                import csv, io
+                buf = io.StringIO()
+                w = csv.DictWriter(buf, fieldnames=["Pair", "Verdict", "Details"])
+                w.writeheader()
+                w.writerows(table)
+                st.download_button("⬇️ Batch results (CSV)", buf.getvalue(), "sdoc_batch_results.csv")
+                pick = st.selectbox("Open a pair", results, format_func=lambda t: t[0])
+                show_case(f"batch_{pick[0]}", pick[0], pick[0], None, pick[1], pick[2])
 
 # --------------------------------------------------------------- inbox browser
 with tab_inbox:
