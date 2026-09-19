@@ -276,8 +276,9 @@ def plan_replies(rows_all, hold_mismatch=False):
         if delivery == DELIVERY_NONE:
             continue
         subject, body = draft_reply(r["subject"], result, r["rows"], sender_first_name(r["from"]))
+        facts = [v for row in r["rows"] if row["verdict"] == "mismatch" for v in (row["si"], row["bl"])]
         plan.append({"email_id": r["email_id"], "to": r["from"], "subject": subject, "body": body,
-                     "verdict": r["status"], "delivery": delivery})
+                     "verdict": r["status"], "delivery": delivery, "facts": facts})
     return plan
 
 

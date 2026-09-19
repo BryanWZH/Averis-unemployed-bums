@@ -191,10 +191,40 @@ def docs_for(email):
     return inbox.read_bytes(si_path), si_path, inbox.read_bytes(bl_path), bl_path
 
 
-def _apply_polish(key, body, facts):
-    text, used = ai_reply.polish(body, facts)
-    st.session_state[f"{key}_body"] = text
-    st.session_state[f"{key}_polished"] = used
+def text_box(label, template, state_key, height, disabled=False):
+    """A text area seeded from `template` and driven purely through session state.
+    Passing value= AND writing to the same key (which the polish button does) makes
+    Streamlit warn and can misbehave, so the seed is written once, and again only when
+    the template itself changes (for example a new case, or an edited Playground field)."""
+    seed_key = state_key + "__template"
+    if st.session_state.get(seed_key) != template:
+        st.session_state[seed_key] = template
+        st.session_state[state_key] = template
+    return st.text_area(label, key=state_key, height=height, disabled=disabled)
+
+
+def _apply_polish(state_key, flag_key, fallback, facts):
+    """Reword the message currently in the text box (so a person's edits are kept). The AI
+    result is only used if it kept every value and added no numbers (see ai_reply)."""
+    source = st.session_state.get(state_key, fallback)
+    text, used = ai_reply.polish(source, facts)
+    st.session_state[state_key] = text
+    st.session_state[flag_key] = used
+
+
+def polish_button(btn_key, state_key, flag_key, fallback, facts):
+    """'Polish wording with AI', shown under every draft reply once AI is unlocked."""
+    if not use_ai:
+        return
+    st.button("✨ Polish wording with AI", key=btn_key, on_click=_apply_polish,
+              args=(state_key, flag_key, fallback, facts),
+              help="Rewords the message. If the AI changes any value or adds a number, "
+                   "the original wording is kept.")
+    used = st.session_state.get(flag_key)
+    if used is True:
+        st.caption("✨ Reworded by AI. Every value was checked and is unchanged.")
+    elif used is False:
+        st.caption("The AI rewrite was rejected (it changed a fact or failed), so the wording is unchanged.")
 
 
 def show_case(key, title, subject, sender, result, rows, docs=None):
@@ -249,16 +279,9 @@ def show_case(key, title, subject, sender, result, rows, docs=None):
             first = report.sender_first_name(sender)
             subj, body = report.draft_reply(subject or title, result, rows, first)
             subj_val = st.text_input("Subject", subj, key=f"{key}_subj")
-            body_val = st.text_area("Message", body, height=280, key=f"{key}_body")
-            if use_ai and result["status"] != "NEEDS_REVIEW":
-                facts = [v for r_ in rows if r_["verdict"] == "mismatch" for v in (r_["si"], r_["bl"])]
-                st.button("✨ Polish wording with AI", key=f"{key}_polish",
-                          on_click=_apply_polish, args=(key, body, facts),
-                          help="Rewords the message. If the AI changes any value or adds a number, "
-                               "the original template is kept.")
-                if st.session_state.get(f"{key}_polished") is False:
-                    st.caption("The AI rewrite was rejected (it changed a fact or failed), so the "
-                               "template is kept.")
+            body_val = text_box("Message", body, f"{key}_body", 280)
+            facts = [v for r_ in rows if r_["verdict"] == "mismatch" for v in (r_["si"], r_["bl"])]
+            polish_button(f"{key}_polish", f"{key}_body", f"{key}_polished", body, facts)
             to_addr = sender if sender and "@" in sender else ""
             st.link_button("✉️ Open in my email app", report.mailto_link(to_addr, subj_val, body_val))
             st.caption("Opens your own mail program with the recipient, subject and message filled in, "
@@ -348,8 +371,11 @@ with tab_out:
                                          else item["verdict"].replace("_", " ").capitalize()),
                                         ("Delivery", item["delivery"])]), unsafe_allow_html=True)
             can_edit = item["delivery"] in (report.DELIVERY_HELD, report.DELIVERY_HUMAN)
-            body_now = st.text_area("Message (you can edit it before approving)" if can_edit else "Message",
-                                    item["body"], height=260, disabled=not can_edit, key=f"ob_body_{idx}")
+            body_now = text_box("Message (you can edit it before approving)" if can_edit else "Message",
+                                item["body"], f"ob_body_{idx}", 260, disabled=not can_edit)
+            if can_edit:
+                polish_button(f"ob_polish_{idx}", f"ob_body_{idx}", f"ob_polished_{idx}",
+                              item["body"], item.get("facts", []))
             if item.get("edited"):
                 st.caption("✏️ Approved with your edits.")
             if item["delivery"] == report.DELIVERY_HELD:
@@ -425,7 +451,8 @@ with tab_compare:
             d3.button("✖ Clear sample", key="sm_clear", on_click=lambda: st.session_state.pop("sample_id", None))
             result, si_res, bl_res = cached_compare(si_b, si_n, bl_b, bl_n, use_ai=use_ai,
                                                     cross_check=cross_check)
-            show_case("sample", sm["title"], sm["title"], None, result, report.field_rows(si_res, bl_res))
+            show_case(f"sample_{sm['id']}", sm["title"], sm["title"], None, result,
+                      report.field_rows(si_res, bl_res), docs=(si_b, si_n, bl_b, bl_n))
     else:
         st.write("Drop many documents at once. Files are paired automatically by name: each pair "
                  "needs one file with a standalone **SI** and one with **BL** in its name "

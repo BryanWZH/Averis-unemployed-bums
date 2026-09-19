@@ -101,6 +101,7 @@ def test_outbox_never_replies_to_reviews_and_can_hold_mismatches():
     assert all(p["delivery"] == report.DELIVERY_HUMAN for p in auto if p["verdict"] == "NEEDS_REVIEW")
     assert not any(p["delivery"] == report.DELIVERY_SENT for p in auto if p["verdict"] == "NEEDS_REVIEW")
     assert all(p["delivery"] == report.DELIVERY_HELD for p in held if p["verdict"] == "MISMATCH")
+    assert all(p["facts"] for p in auto if p["verdict"] == "MISMATCH")     # values the AI polish must keep
     assert sum(p["delivery"] == report.DELIVERY_SENT for p in auto) > sum(
         p["delivery"] == report.DELIVERY_SENT for p in held)
 
