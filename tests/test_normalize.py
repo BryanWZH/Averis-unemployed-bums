@@ -3,7 +3,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from normalize import normalize_value as n  # noqa: E402
+from normalize import normalize_value as n, field_for_label as label  # noqa: E402
 
 SAME = [
     ("gross_weight_kg", "61,026 KG", "61,026.00 KG"),
@@ -39,7 +39,33 @@ def test_real_differences_stay_different():
         assert n(field, a) != n(field, b), (field, a, b)
 
 
+MAPS = {
+    "Shipper": "shipper", "Exporter": "shipper", "Seller": "shipper",
+    "Load Port": "port_of_loading", "POL": "port_of_loading",
+    "Port of Discharge (POD)": "port_of_discharge",
+    "Total Containers": "container_count",
+    "TOTAL Gross Weight (KGS)": "gross_weight_kg",
+    "TOTAL Gross Weightnn(KGS)": "gross_weight_kg",   # overlapped PDF columns
+    "Notify Party/Intermediate Consignee": "notify_party",
+}
+NOT_FIELDS = ["Shipper Reference", "Shipper Ref (X)", "Consignee Tel", "Consignee Contact",
+              "Notify Party Address", "Port of Loading Code", "Net Weight (KG)",
+              "Total Packages", "Gross Weight Unit", "Port", "Booking Reference"]
+
+
+def test_known_labels_map():
+    for raw, field in MAPS.items():
+        assert label(raw) == field, raw
+
+
+def test_lookalike_labels_do_not_map():
+    for raw in NOT_FIELDS:
+        assert label(raw) is None, raw
+
+
 if __name__ == "__main__":
+    test_known_labels_map()
+    test_lookalike_labels_do_not_map()
     test_equivalent_values_compare_equal()
     test_real_differences_stay_different()
     print("ok")
