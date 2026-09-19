@@ -189,9 +189,10 @@ def audit_rows(rows):
             decision = "Normalised values are identical"
         else:
             decision = "Normalised values differ: flagged as a defect"
-        out.append({"Field": r["label"], "SI (as read)": r["si"] or "—", "BL (as read)": r["bl"] or "—",
-                    "SI (normalised)": r.get("si_norm") or "—", "BL (normalised)": r.get("bl_norm") or "—",
-                    "Rule applied": RULES[r["field"]], "Decision": decision})
+        out.append({"Field": r["label"],
+                    "SI (normalised)": r.get("si_norm") or "—",
+                    "BL (normalised)": r.get("bl_norm") or "—",
+                    "Decision": decision, "Rule applied": RULES[r["field"]]})
     return out
 
 
