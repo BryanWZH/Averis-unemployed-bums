@@ -7,6 +7,7 @@ values so the comparator isn't fooled by formatting differences (commas in
 weights, a trailing "(CODE)" on a port, "6 x 40'HC" vs "6", etc).
 """
 import re
+from decimal import Decimal, InvalidOperation
 
 # Canonical field -> every label string we've seen used for it (SI or BL,
 # any file format). Matching is case-insensitive and tolerant of a trailing
@@ -168,11 +169,63 @@ def normalize_value(field, raw_value):
         return v or None
 
     if field == "container_count":
-        m = re.search(r"\d+", v)
-        return m.group(0) if m else None
+        return _container_count(v)
 
     if field == "gross_weight_kg":
-        digits = re.sub(r"[^\d]", "", v)
-        return digits if digits else None
+        return _weight_kg(v)
 
     return v
+
+
+def _container_count(v):
+    """'3 x 40'HC' -> '3', "40'HC x 3" -> '3', '03 CONTAINERS' -> '3'."""
+    for pat in (r"^\s*(\d+)\s*[xX×]",                        # "3 x 40'HC"
+                r"\d+\s*['’]?\s*[A-Za-z]{0,3}\s*[xX×]\s*(\d+)\b",  # "40'HC x 3"
+                r"(\d+)"):
+        m = re.search(pat, v)
+        if m:
+            return str(int(m.group(1)))
+    return None
+
+
+_TONNE_RE = re.compile(r"\b(mts?|tonnes?|tons?|t)\b", re.I)
+_LB_RE = re.compile(r"\b(lbs?|pounds?)\b", re.I)
+
+
+def _weight_kg(v):
+    """Parse a printed weight into kilograms as a canonical string, so
+    '61,026 KG', '61,026.00 KGS', '61.026,00' and '61.026 MT' all agree."""
+    m = re.search(r"\d[\d.,\s]*", v)
+    if not m:
+        return None
+    num = m.group(0).strip().replace(" ", "")
+    tonnes = bool(_TONNE_RE.search(v))
+    dots, commas = num.count("."), num.count(",")
+    if dots and commas:
+        dec = "." if num.rfind(".") > num.rfind(",") else ","
+    elif dots > 1 or commas > 1:
+        dec = None                                   # only thousands separators
+    elif dots or commas:
+        sep = "." if dots else ","
+        tail = num.split(sep)[1]
+        # one separator + exactly 3 digits is thousands ("61,026") unless
+        # the unit is tonnes, where "61.026 MT" is a decimal.
+        dec = sep if (len(tail) != 3 or tonnes) else None
+    else:
+        dec = None
+    if dec:
+        int_part, _, frac = num.rpartition(dec)
+        int_part = re.sub(r"[.,]", "", int_part)
+        num = f"{int_part or '0'}.{frac}"
+    else:
+        num = re.sub(r"[.,]", "", num)
+    try:
+        val = Decimal(num)
+    except InvalidOperation:
+        return None
+    if tonnes:
+        val *= 1000
+    elif _LB_RE.search(v):
+        val *= Decimal("0.45359237")
+    val = val.quantize(Decimal("0.001")).normalize()
+    return format(val, "f")
