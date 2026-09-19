@@ -343,3 +343,34 @@ def time_saved(rows_all, minutes_per_check=5.0, minutes_per_reply=2.0):
     minutes = decided * (minutes_per_check + minutes_per_reply)
     return {"checks": decided, "replies": decided, "escalated": escalated,
             "minutes": minutes, "hours": minutes / 60.0}
+
+
+# ------------------------------------------------------------ HTML tables
+_PILL = {"match": ("ok", "✔", "Match"), "mismatch": ("bad", "✖", "Differs"), "blank": ("warn", "⚠", "Blank")}
+
+
+def field_table_html(rows):
+    """The field-by-field comparison as one bordered table. Problem rows are tinted and
+    every result carries an icon AND a word, so meaning never depends on colour alone.
+    Built on one line: indented HTML would be treated as a code block by Markdown."""
+    head = ("<thead><tr><th>Field</th><th>Shipping Instruction</th><th>Draft BL</th>"
+            "<th>Result</th></tr></thead>")
+    body = []
+    for r in rows:
+        cls, icon, word = _PILL.get(r["verdict"], _PILL["blank"])
+        if r["verdict"] == "mismatch":
+            si_html, bl_html = diff_html(r["si"], r["bl"])
+        else:
+            si_html, bl_html = html.escape(r["si"] or "—"), html.escape(r["bl"] or "—")
+        row_cls = {"ok": "", "bad": " class='bad'", "warn": " class='warn'"}[cls]
+        body.append(f"<tr{row_cls}><td class='f'>{html.escape(r['label'])}</td>"
+                    f"<td class='v'>{si_html}</td><td class='v'>{bl_html}</td>"
+                    f"<td><span class='sd-pill {cls}'>{icon} {word}</span></td></tr>")
+    return f"<div class='sd-tblwrap'><table class='sd-tbl'>{head}<tbody>{''.join(body)}</tbody></table></div>"
+
+
+def kv_html(pairs):
+    """A small bordered card of label/value lines, e.g. To / Subject. Values are escaped."""
+    rows = "".join(f"<tr><td class='k'>{html.escape(str(k))}</td><td>{html.escape(str(v))}</td></tr>"
+                   for k, v in pairs)
+    return f"<div class='sd-tblwrap'><table class='sd-kv'><tbody>{rows}</tbody></table></div>"

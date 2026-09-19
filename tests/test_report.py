@@ -82,6 +82,25 @@ def test_time_saved_only_counts_real_automatic_checks():
     assert t["checks"] == 2 and t["escalated"] == 1 and t["minutes"] == 14 and round(t["hours"], 2) == 0.23
 
 
+def test_field_table_flags_problems_with_icon_and_word_and_escapes_html():
+    rows = [
+        {"label": "Shipper", "si": "ACME", "bl": "ACME", "verdict": "match"},
+        {"label": "Consignee", "si": "AL GURQ <b>X</b>", "bl": "AL GURG <b>X</b>", "verdict": "mismatch"},
+        {"label": "Notify party", "si": "BOB", "bl": "", "verdict": "blank"},
+    ]
+    h = report.field_table_html(rows)
+    assert h.count("<tr") == 4                                   # header + 3 rows
+    assert h.count("class='bad'") == 1 and h.count("class='warn'") == 1
+    assert "✔ Match" in h and "✖ Differs" in h and "⚠ Blank" in h
+    assert "<b>" not in h and "&lt;b&gt;" in h                   # untrusted text is escaped
+    assert "<mark" in h and chr(10) not in h                     # diff highlight, single line
+
+
+def test_kv_html_escapes_values():
+    h = report.kv_html([("To", "a@b.com"), ("Subject", "<script>x</script>")])
+    assert "a@b.com" in h and "<script>" not in h
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

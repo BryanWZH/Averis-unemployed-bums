@@ -63,6 +63,26 @@ st.markdown("""
 .sdoc-badge {display:inline-block; padding:.35rem .9rem; border-radius:999px; font-weight:700;
              font-size:1.05rem; letter-spacing:.02em;}
 .sdoc-diff {font-family: ui-monospace, Menlo, Consolas, monospace; font-size:.95rem;}
+.sd-tblwrap {overflow-x:auto; margin:.4rem 0 1rem;}
+.sd-tbl, .sd-kv {width:100%; border-collapse:separate; border-spacing:0;
+                 border:1px solid rgba(128,128,128,.28); border-radius:12px; overflow:hidden;}
+.sd-tbl th {text-align:left; padding:.6rem .9rem; font-size:.76rem; text-transform:uppercase;
+            letter-spacing:.06em; opacity:.75; background:rgba(128,128,128,.14);}
+.sd-tbl td, .sd-kv td {padding:.65rem .9rem; border-top:1px solid rgba(128,128,128,.18);
+                       vertical-align:top; word-break:break-word;}
+.sd-tbl tbody tr:first-child td, .sd-kv tbody tr:first-child td {border-top:none;}
+.sd-tbl td.f {font-weight:700; white-space:nowrap;}
+.sd-tbl td.v {font-family: ui-monospace, Menlo, Consolas, monospace; font-size:.9rem;}
+.sd-tbl tr.bad td {background:rgba(208,59,59,.11);}
+.sd-tbl tr.bad td.f {box-shadow: inset 4px 0 0 #d03b3b;}
+.sd-tbl tr.warn td {background:rgba(250,178,25,.13);}
+.sd-tbl tr.warn td.f {box-shadow: inset 4px 0 0 #fab219;}
+.sd-pill {display:inline-block; padding:.15rem .65rem; border-radius:999px; font-weight:700;
+          font-size:.82rem; white-space:nowrap;}
+.sd-pill.ok {background:rgba(30,142,90,.20);}
+.sd-pill.bad {background:rgba(208,59,59,.22);}
+.sd-pill.warn {background:rgba(250,178,25,.28);}
+.sd-kv td.k {width:9.5rem; font-weight:700; opacity:.8; background:rgba(128,128,128,.10); white-space:nowrap;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -186,12 +206,13 @@ def show_case(key, title, subject, sender, result, rows, docs=None):
         st.markdown(f"**Differs in:** {names}")
     elif result["status"] == "NEEDS_REVIEW":
         reason = result.get("review_reason")
-        st.markdown(f"**Why:** {report.REASONS.get(reason, reason)}")
-        st.markdown(f"**Suggested next step:** {report.NEXT_STEP.get(reason, 'Check manually.')}")
+        pairs = [("Why", report.REASONS.get(reason, reason)),
+                 ("Next step", report.NEXT_STEP.get(reason, "Check manually."))]
         dis = result.get("disagreements")
         if dis:
             names = sorted(set(dis["si"]) | set(dis["bl"]))
-            st.markdown("**Readers disagree on:** " + ", ".join(report.FIELD_NAMES[f] for f in names))
+            pairs.append(("Readers disagree on", ", ".join(report.FIELD_NAMES[f] for f in names)))
+        st.markdown(report.kv_html(pairs), unsafe_allow_html=True)
         if use_ai and docs:
             if st.button("🤖 Ask AI for a second opinion", key=f"{key}_op_btn"):
                 with st.spinner("The AI is reading the documents..."):
@@ -199,13 +220,12 @@ def show_case(key, title, subject, sender, result, rows, docs=None):
             op = st.session_state.get(f"{key}_op")
             if op:
                 if op["available"] and op["suggested_defects"]:
-                    lines = []
-                    for f in op["suggested_defects"]:
-                        lines.append(f"- **{report.FIELD_NAMES[f]}**: SI `{op['si_res'].fields.get(f)}` "
-                                     f"vs BL `{op['bl_res'].fields.get(f)}`")
                     st.info("🤖 **AI second opinion (advisory only, the verdict above is unchanged).** "
-                            "The AI thinks these fields differ; please confirm against the originals:"
-                            + chr(10) * 2 + chr(10).join(lines))
+                            "The AI thinks these fields differ; please confirm against the originals.")
+                    st.markdown(report.field_table_html(
+                        [{"label": report.FIELD_NAMES[f], "si": op["si_res"].fields.get(f) or "",
+                          "bl": op["bl_res"].fields.get(f) or "", "verdict": "mismatch"}
+                         for f in op["suggested_defects"]]), unsafe_allow_html=True)
                 elif op["available"]:
                     st.info("🤖 **AI second opinion (advisory only).** The AI found no differences in the "
                             "fields it could read. A person should still confirm.")
@@ -216,21 +236,7 @@ def show_case(key, title, subject, sender, result, rows, docs=None):
 
     if rows:
         st.markdown("**Field by field**")
-        h = st.columns([1.3, 3, 3, 0.9])
-        for c, t in zip(h, ("Field", "Shipping Instruction", "Draft BL", "Result")):
-            c.markdown(f"<span style='color:#6b7280;font-size:.85rem'>{t}</span>", unsafe_allow_html=True)
-        for r in rows:
-            c1, c2, c3, c4 = st.columns([1.3, 3, 3, 0.9])
-            c1.markdown(f"**{r['label']}**")
-            if r["verdict"] == "mismatch":
-                a, b = report.diff_html(r["si"], r["bl"])
-                c2.markdown(f"<div class='sdoc-diff'>{a}</div>", unsafe_allow_html=True)
-                c3.markdown(f"<div class='sdoc-diff'>{b}</div>", unsafe_allow_html=True)
-                c4.markdown("❌")
-            else:
-                c2.markdown(f"<div class='sdoc-diff'>{r['si'] or '—'}</div>", unsafe_allow_html=True)
-                c3.markdown(f"<div class='sdoc-diff'>{r['bl'] or '—'}</div>", unsafe_allow_html=True)
-                c4.markdown("✅" if r["verdict"] == "match" else "⚠️")
+        st.markdown(report.field_table_html(rows), unsafe_allow_html=True)
 
     if rows:
         with st.expander("🔎 Audit trail: how each field was decided"):
@@ -337,8 +343,10 @@ with tab_out:
         if shown:
             idx, item = item_picker("Preview a message", shown, "ob_pick", lambda t: t[0],
                                     lambda t: f"{t[1]['email_id']}: {t[1]['delivery']}")
-            st.markdown(f"**To:** {item['to']}")
-            st.markdown(f"**Subject:** {item['subject']}")
+            st.markdown(report.kv_html([("To", item["to"]), ("Subject", item["subject"]),
+                                        ("Verdict", "OK" if item["verdict"] == "OK"
+                                         else item["verdict"].replace("_", " ").capitalize()),
+                                        ("Delivery", item["delivery"])]), unsafe_allow_html=True)
             can_edit = item["delivery"] in (report.DELIVERY_HELD, report.DELIVERY_HUMAN)
             body_now = st.text_area("Message (you can edit it before approving)" if can_edit else "Message",
                                     item["body"], height=260, disabled=not can_edit, key=f"ob_body_{idx}")
@@ -506,11 +514,15 @@ with tab_play:
         _pg_load()
     st.markdown("**Quick edits to the BL:**")
     q = st.columns(6)
-    q[0].button("⚖️ Change the weight", key="pgb_w", on_click=_pg_break, args=("weight",), width="stretch")
-    q[1].button("🔤 Typo in consignee", key="pgb_t", on_click=_pg_break, args=("typo",), width="stretch")
-    q[2].button("🚢 Swap a port", key="pgb_p", on_click=_pg_break, args=("port",), width="stretch")
-    q[3].button("⬜ Blank a field", key="pgb_b", on_click=_pg_break, args=("blank",), width="stretch")
-    q[4].button("🔧 Reformat weight", key="pgb_f", on_click=_pg_break, args=("format",), width="stretch",
+    q[0].button("⚖️ Weight", key="pgb_w", on_click=_pg_break, args=("weight",), width="stretch",
+                help="Adds 1,000 kg to the BL gross weight")
+    q[1].button("🔤 Name typo", key="pgb_t", on_click=_pg_break, args=("typo",), width="stretch",
+                help="Changes one letter in the BL consignee name")
+    q[2].button("🚢 Swap port", key="pgb_p", on_click=_pg_break, args=("port",), width="stretch",
+                help="Sets the BL port of discharge to Rotterdam")
+    q[3].button("⬜ Blank field", key="pgb_b", on_click=_pg_break, args=("blank",), width="stretch",
+                help="Empties the BL notify party")
+    q[4].button("🔧 Reformat", key="pgb_f", on_click=_pg_break, args=("format",), width="stretch",
                 help="Writes the same weight a different way. It should still match.")
     q[5].button("↩️ Reset", key="pgb_r", on_click=_pg_load, width="stretch")
     left, right = st.columns(2)
@@ -542,7 +554,10 @@ with tab_inbox:
         pick = item_picker("Pick an email", shown, "ib_pick", lambda r: r["email_id"],
                            lambda r: f"{r['email_id']}: {r['subject'][:80]}")
         email = Inbox(str(DATA_DIR)).get(pick["email_id"])
-        st.markdown(f"**Category:** `{pick['category']}`  ·  **From:** {email.get('from', '')}")
+        pairs = [("From", email.get("from", "")), ("Category", pick["category"].replace("_", " ").title())]
+        if pick["category"] == "BL_COMPARISON":       # other emails have no verdict to show
+            pairs.append(("Verdict", STATUS_STYLE[pick["status"]][2].title() if pick["status"] != "OK" else "OK"))
+        st.markdown(report.kv_html(pairs), unsafe_allow_html=True)
         st.text_area("Body", email.get("body", ""), height=180, disabled=True,
                      key=f"body_{pick['email_id']}")
         if pick["category"] == "BL_COMPARISON":
