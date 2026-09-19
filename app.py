@@ -16,6 +16,27 @@ try:
 except Exception:
     pass
 
+import importlib
+import sys
+
+
+def _refresh_local_modules():
+    """After a redeploy, Streamlit Cloud can keep OLD copies of our helper modules in memory
+    while running the NEW app.py (which then crashes with "no attribute ..."). Remember a
+    signature of the source files; when it changes, or when modules are already loaded but we
+    have never recorded one (a stale process), reload them all in dependency order."""
+    here = Path(__file__).parent
+    sig = tuple((f.name, f.stat().st_mtime_ns) for f in sorted(here.glob("*.py")))
+    if getattr(sys, "_sdoc_sig", None) != sig:
+        for name in ("loader", "normalize", "extract", "classify", "ai_extract", "ai_reply",
+                     "pipeline", "report", "samples", "dashboard"):
+            if name in sys.modules:
+                importlib.reload(sys.modules[name])
+        sys._sdoc_sig = sig
+
+
+_refresh_local_modules()
+
 import ai_extract
 import ai_reply
 import classify
