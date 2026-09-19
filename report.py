@@ -8,6 +8,7 @@ import html
 import io
 import json
 import re
+from urllib.parse import quote
 
 import classify
 import pipeline
@@ -223,3 +224,9 @@ def pair_documents(names):
         else:
             unpaired.extend(d.values())
     return pairs, unpaired
+
+
+def mailto_link(to, subject, body):
+    """A mailto: URL that opens the user's mail client pre-filled. Real
+    functionality: nothing is sent until the user presses send there."""
+    return f"mailto:{quote(to or '', safe='@,')}?subject={quote(subject, safe='')}&body={quote(body, safe='')}"

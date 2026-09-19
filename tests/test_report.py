@@ -43,6 +43,12 @@ def test_inbox_analysis_matches_the_batch_pipeline():
     assert got == {k: {x: v[x] for x in keys} for k, v in ref.items()}
 
 
+def test_mailto_link_is_prefilled_and_safe():
+    url = report.mailto_link("a@b.com", "RE: Docs & more", "Line 1\nLine 2 & 100%")
+    assert url.startswith("mailto:a@b.com?subject=")
+    assert "%0A" in url and "%26" in url and " " not in url
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

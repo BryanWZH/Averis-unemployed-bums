@@ -130,8 +130,12 @@ def show_case(key, title, subject, sender, result, rows):
         with st.expander("✉️ Draft reply to the sender", expanded=result["status"] != "OK"):
             first = (sender or "").split("@")[0].replace(".", " ").replace("_", " ").title() or None
             subj, body = report.draft_reply(subject or title, result, rows, first)
-            st.text_input("Subject", subj, key=f"{key}_subj")
-            st.text_area("Message", body, height=280, key=f"{key}_body")
+            subj_val = st.text_input("Subject", subj, key=f"{key}_subj")
+            body_val = st.text_area("Message", body, height=280, key=f"{key}_body")
+            to_addr = sender if sender and "@" in sender else ""
+            st.link_button("✉️ Open in my email app", report.mailto_link(to_addr, subj_val, body_val))
+            st.caption("Opens your own mail program with the recipient, subject and message filled in, "
+                       "including any edits above. SDOC does not send email itself.")
     st.download_button("⬇️ Download report (Markdown)", report.report_markdown(title, result, rows),
                        file_name=f"{key}_report.md", key=f"{key}_dl")
 
