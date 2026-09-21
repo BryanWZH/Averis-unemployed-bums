@@ -140,6 +140,8 @@ def ai_extract(data: bytes, filename: str) -> ExtractResult:
         res.unreadable_reason = "no_api_key_configured"
         return res
 
+    res.source = "ai"   # past this point, this result is the AI reader's own attempt (success or not)
+
     try:
         blocks = _content_block_for(data, filename)
         message = None

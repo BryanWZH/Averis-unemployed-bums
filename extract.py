@@ -19,6 +19,8 @@ class ExtractResult:
         self.title = None
         self.fields = {}          # canonical field -> raw string value
         self.ocr_used = False
+        self.source = "rule"      # "rule" or "ai" -- which reader actually produced this result,
+                                   # so the UI can show visitors whether AI reading was really used
         self.raw_text = ""        # best-effort flat text, for title/type checks
 
 
