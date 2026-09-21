@@ -21,7 +21,26 @@ OK, MISMATCH (naming the exact fields) or NEEDS_REVIEW (unreadable file, wrong
 document type, missing attachment, blank field). AI reads the documents; plain,
 auditable code makes the decision.
 
-**Extras:** a dashboard with time-saved estimates, a review queue, a simulated Outbox that drafts a reply to every sender (uncertain cases are held for a person; nothing is really emailed), a Playground for breaking a document and watching the verdict change, an audit trail for every field, and optional AI second opinion and reply polishing that can never change a verdict.
+**Where AI fits in, and where it deliberately doesn't:** by default DocHarbor reads
+every document with free, rule-based parsing (txt/PDF/Word/Excel, plus OCR for
+scans) — no API key needed, and it's what produced the submitted result: a
+**perfect 1.0000** on the organizer's scorer across the 520-email dataset,
+46/46 defects caught end to end. AI is an optional upgrade on top of that, off by default, that a
+visitor can switch on to see four things: (1) **AI document reading** — Claude
+reads the same seven fields, including scans an OCR pass can't, and the exact
+same deterministic code still makes the OK/MISMATCH/NEEDS_REVIEW call — the AI
+only ever supplies the reading, never the verdict; (2) **cross-check** — the AI
+and rule-based readers both read every document, and any field they disagree
+on sends the case to a human instead of picking a side; (3) **AI second
+opinion** — on a case already escalated to a human, the AI can offer an
+advisory read of its own, shown separately and never allowed to change the
+verdict above it; (4) **AI reply polish** — reword a drafted reply to sound
+more natural, guarded so the rewrite is discarded outright if it changes a
+name, a number, or any other fact. In short: the free reader is what earned
+the perfect score; AI is there to read harder documents and add a second set
+of eyes, never to make or overrule a decision.
+
+**Extras:** a dashboard with time-saved estimates, a review queue, a simulated Outbox that drafts a reply to every sender (uncertain cases are held for a person; nothing is really emailed), a Playground for breaking a document and watching the verdict change, and an audit trail for every field.
 
 ## 2. Slide deck outline (about 8 slides)
 
