@@ -64,8 +64,9 @@ A language model never gets a vote on whether a discrepancy is real.
 
 **Measured, not estimated:** run against a real key and the organizer's
 official scorer, the AI reader also scores a perfect **1.0000** on all 520
-emails — 240 real Claude calls, 220/220 comparisons decided exactly right,
-46/46 defects caught, zero false alarms, zero wrong escalations. The free
+emails — 240 real Claude calls, 200/200 comparisons decided exactly right,
+plus all 20 edge cases correctly escalated, 46/46 defects caught, zero false
+alarms, zero wrong escalations. The free
 rule-based reader, which needs no API key at all, independently scores the
 same perfect **1.0000**. Two different readers, one deterministic decision
 engine, the same perfect result — that's the headline: the AI reader is fully
@@ -134,55 +135,54 @@ that, not the finished product.
    explicitly as "if we advance, here's the extension," per the brief's
    requirement that the Final Round build on the Preliminary one.
 
-## 3. Demo video script (target 4:40, hard limit 5:00)
+## 3. Demo video script (target 4:20, hard limit 5:00)
 
-**Priority order, since the rubric weights this:** (1) AI mode working live on
-camera — "Working Core Prototype" is 25 of 100 points, the single biggest line
-item, and it means the AI reader, not the fallback; (2) say the validation
-numbers out loud — "Technical Feasibility & Validation" is 15 points and is
-lost by staying implicit; (3) everything else.
+**Priority order:** (1) AI mode working live on camera — "Working Core
+Prototype" is 25 of 100 points, the single biggest line item, and it means
+the AI reader, not the fallback; (2) say the validation numbers out loud —
+"Technical Feasibility & Validation" is 15 points and is lost by staying
+implicit; (3) everything else.
 
-Read the "Say" column roughly as written — it's timed to fit. Everything in
-"Show" is the live app at
-averis-unemployed-bums-yw82lbdvxstupvjeosomwc.streamlit.app, except the title
-and roadmap beats, which can be a slide or just you talking over the DocHarbor
-header. **Test this entire run-through once before recording** — confirm the
-access code and "Read documents with AI" actually work on the live site first
-(see the checklist item below); don't discover a problem while filming.
+This is built from the team's actual screen recording, re-cut to this order —
+trim and re-sequence the recorded clips to match the Show column below
+rather than using the raw recording's original order. Three moments use a
+slide from `docs/DocHarbor_slides.pptx` instead of live app footage (noted in
+the Show column); everything else is the live app at
+averis-unemployed-bums-yw82lbdvxstupvjeosomwc.streamlit.app.
 
 | Time | Show | Say |
 |---|---|---|
-| 0:00 | Title slide / app header | "Hi, we're Unemployed Bums. This is DocHarbor, a shipping document verification system, for the Averis x Monash Hackathon. Shipping teams manually check a Shipping Instruction against a draft Bill of Lading across seven fields, by eye, hundreds of times a day. One missed typo means an amended Bill of Lading, delays and cost." |
-| 0:20 | Dashboard tab | "DocHarbor sorts every email into one of five categories, and every document comparison gets a clear verdict: OK, MISMATCH with the exact fields named, or NEEDS REVIEW when something can't be trusted." |
-| 0:40 | Sidebar: type the AI access code, toggle "Read documents with AI" ON | "Here's the core of it, working live. This is our AI reader — I'm entering the access code and switching it on now." |
-| 1:00 | Compare documents tab -> a sample, with AI reading ON, watch it actually read and decide | "Watch this: DocHarbor sends the real document to Claude, which reads it, and this exact field table and verdict come back — read by AI, decided by deterministic code underneath, live, not a script." |
-| 1:25 | Point at the small caption right under the verdict badge | "That line right there — 'Read with AI, Claude' — is the proof. It only says that when AI actually did the reading; switch AI off and it says 'rule-based reader' instead." |
-| 1:35 | Point at the field table + open "Audit trail" expander | "That split — AI reads, code decides — is the actual innovation here, not just an architecture note. A language model never gets a vote on whether a discrepancy is real. This audit trail shows the value as read, the cleaned-up value that was compared, and the rule that made the call." |
-| 2:00 | Compare documents -> "Scanned image" sample -> "Ask AI for a second opinion" | "For cases sent to a human, like an unreadable scan, AI can offer a second opinion. It's advisory only — it can never change the verdict above it." |
-| 2:20 | Open "Draft reply", press "Polish wording with AI" | "Every reply is drafted automatically, and AI can optionally reword it — guarded so that if it changes a number or a name, the rewrite is thrown away and the original wording is kept." |
-| 2:40 | Just talk, over the dashboard or a slide | "We didn't just claim this works — we checked it against the organizer's official scorer, then separately against four independently generated datasets to rule out overfitting to one sample. It's backed by 26 automated unit tests and 43 real-browser checks of the interface itself." |
-| 3:00 | Results slide / dashboard KPI tiles | "We measured this for real: a perfect 1.0000 on the organizer's scorer with the AI reader — 240 live Claude calls, every comparison decided exactly right. The free rule-based reader, no API key needed, independently scores that same perfect 1.0000, so DocHarbor works at zero API cost by default, and the AI mode you just saw is a fully validated upgrade on top, not a guess." |
-| 3:25 | Outbox tab: toggle hold, press "Process the inbox" | "The Outbox simulates replying to every sender — OK and mismatch replies go out automatically, anything uncertain is held for a person. No real email is ever sent; that's simulated on purpose." |
-| 3:50 | Playground tab: pick a sample, press "Weight" or "Name typo" | "The Playground lets you break a document on purpose and watch the real decision engine react instantly — the same engine deciding, live." |
-| 4:10 | Roadmap slide | "This is our Preliminary Round entry. For the Final Round, if we advance, we'd add more document types, more fields, and a real mailbox connection instead of a simulation. Thanks for watching." |
+| 0:00 | **Slide 1 (Title)** | "Hi, we're Unemployed Bums. This is DocHarbor, a shipping document verification system, for the Averis x Monash Hackathon." |
+| 0:12 | Dashboard opening (stat cards, donut, categories) | "Shipping teams manually check a Shipping Instruction against a draft Bill of Lading across seven fields, by eye, hundreds of times a day. One missed typo means an amended Bill of Lading, delays and cost." |
+| 0:30 | Sidebar: type the AI access code, toggle "Read documents with AI" ON | "Here's the core of it, working live — I'm switching on our AI reader now." |
+| 0:45 | Badge changes to "AI reader on"; Compare Documents tab, run "Everything matches" | "Watch this: DocHarbor sends the document to Claude, which reads it, and this exact field table and verdict come back — live, not a script." |
+| 1:10 | Point at the caption under the verdict: "Read with AI (Claude) — the fields below came from the AI reader; the verdict above still comes from plain code" | "That line is the proof. It only says that when AI actually did the reading — the verdict itself never comes from the model." |
+| 1:25 | Open the Audit trail expander | "Every field's decision is auditable: the value as read, the normalised value, and the exact rule that made the call. A language model never gets a vote on whether a discrepancy is real." |
+| 1:45 | Click "Open in my email app" — a real Outlook draft opens, pre-filled | "This isn't a mockup — it hands off to your actual email client with the reply already drafted." |
+| 2:00 | "Scanned image" sample -> NEEDS REVIEW, Why / Next step shown | "It doesn't guess. A scan, a wrong document, a blank field — all escalated with a clear reason." |
+| 2:15 | Click "Ask AI for a second opinion" | "For cases sent to a human, AI can offer a second opinion — advisory only, it can never override the verdict above it." |
+| 2:35 | Talk over Inbox Browser | "We checked this against the organizer's official scorer, then separately against four independently generated datasets to rule out overfitting. It's backed by 26 automated unit tests and 43 real-browser checks." |
+| 2:55 | **Slide 10 (Validation results)** | "Measured for real: a perfect 1.0000 with the AI reader live — 240 Claude calls, 200 out of 200 comparisons decided exactly right, plus all 20 edge cases correctly escalated. The free rule-based reader scores that same perfect 1.0000 with zero API cost — the AI mode is a validated upgrade, not a guess." |
+| 3:20 | Outbox tab: point at "Simulation mode: no email is actually sent" banner, toggle "Hold mismatch replies for approval", press Process | "The Outbox shows exactly what would be sent — nothing really is. Mismatch replies can be held back for a person to approve first." |
+| 3:45 | Playground: edit the Shipper field live, verdict flips to MISMATCH on screen | "Change one letter, and the real decision engine reacts instantly — this is the same engine deciding, live." |
+| 4:05 | **Slide 11 (Roadmap)** | "This is our Preliminary Round entry. For the Final Round, we'd add more document types, more fields, and a real mailbox connection. Thanks for watching." |
 
 Recording tips:
-- Screen-record the live site in a real browser (not the code). Zoom the browser to ~110%
-  so text reads clearly on video.
-- Show both light and dark theme at least once if you have time — it's a design highlight,
-  but only after the AI-mode beat above; don't let it push that out of the video.
-- Record with any screen recorder (Windows: Xbox Game Bar, Win+G), upload to YouTube as
-  **Unlisted** or Public (never Private, judges can't open it), and stay under 5 minutes —
-  the brief says marks are lost for going over.
+- Two clips already exist — the long walkthrough and a short theme-toggle
+  clip. Cut the long one down to match the Show column above; the theme clip
+  is optional filler only if time remains under 4:20.
+- Zoom the browser to ~110% before recording so on-screen text reads clearly.
+- Upload to YouTube as Unlisted or Public (never Private), stay under 5:00.
 
 ## 4. Submission checklist
 
 - [x] Public GitHub repo: https://github.com/isaaclew1102-web/Averis-unemployed-bums
 - [x] Live deployed app (opens WITHOUT signing in, verified): https://averis-unemployed-bums-yw82lbdvxstupvjeosomwc.streamlit.app/
 - [x] **Ran `evaluate_ai.py` for real** — the true `ai_only` score from
-      `score_cli.py` is a perfect **1.0000** (240 live Claude calls, 220/220
-      comparisons exact, 46/46 defects caught, 0 false alarms, 0 wrong
-      escalations). Matches the rule-based reader's 1.0000 exactly.
+      `score_cli.py` is a perfect **1.0000** (240 live Claude calls, 200/200
+      comparisons exact, plus all 20 edge cases correctly escalated, 46/46
+      defects caught, 0 false alarms, 0 wrong escalations). Matches the
+      rule-based reader's 1.0000 exactly.
 - [ ] Demo video (YouTube, unlisted/public, max 5 min) — script above shows AI
       mode working live, per the rubric's biggest line item: [link]
 - [x] Slide deck: `docs/DocHarbor_slides.pptx` — Results slide now has the real
