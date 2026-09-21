@@ -45,27 +45,43 @@ auditable code makes the decision.
    (invoice, packing list), more fields, carrier-system integration, human-review
    queue with one-click approve, audit log.
 
-## 3. Demo video script (target 4:00, hard limit 5:00)
+## 3. Demo video script (target 4:20, hard limit 5:00)
+
+Read the "Say" column roughly as written — it's timed to fit. Everything in "Show" is the
+live app at averis-unemployed-bums-yw82lbdvxstupvjeosomwc.streamlit.app, except the two
+title/roadmap beats, which can be a slide or just you talking over the DocHarbor header.
 
 | Time | Show | Say |
 |---|---|---|
-| 0:00 | Title slide | Who we are; the problem in one sentence. |
-| 0:30 | Architecture slide | AI reads, plain code decides, and why. |
-| 1:15 | Live app, "Upload" tab | Upload a matching SI and BL: green OK. |
-| 2:00 | Same tab, mismatched pair | Red MISMATCH naming the exact fields. |
-| 2:45 | "Sample inbox" tab | Pick a scan / wrong document / missing attachment: NEEDS REVIEW with reason. |
-| 3:30 | README / results | Scoring result, fallback, deployment. |
-| 3:50 | Roadmap slide | Where this goes next; thanks. |
+| 0:00 | Title slide / app header | "Hi, we're [team name]. This is DocHarbor, a shipping document verification system. Shipping teams manually check a Shipping Instruction against a draft Bill of Lading across seven fields, by eye, hundreds of times a day. One missed typo means an amended Bill of Lading, delays and cost. DocHarbor does that check automatically." |
+| 0:25 | Dashboard tab | "Every email in the inbox gets sorted into one of five categories, and every document comparison gets a clear verdict: OK, MISMATCH with the exact fields named, or NEEDS REVIEW when something can't be trusted. On the 520-email test set that's 46 mismatches caught and 20 correctly escalated to a human — nothing guessed." |
+| 0:55 | Scroll the Dashboard: donut, funnel, defect fields, "What this saves" | "The dashboard shows how the whole inbox was handled, where the defects are, and roughly how much manual checking this replaces." |
+| 1:20 | Compare documents tab -> "Wrong weight and container count" sample | "Here's a real mismatch. DocHarbor compares all seven fields and shows exactly which ones differ, side by side." |
+| 1:45 | Point at the field table + open "Audit trail" expander | "This audit trail shows the value as read from each document, the cleaned-up value that was actually compared, and the rule that made the call. Every verdict here comes from plain code, not a model's judgment." |
+| 2:05 | Open "Draft reply", press "Polish wording with AI" | "A reply to the sender is drafted automatically. AI can optionally reword it to sound more natural — but it's guarded: if it changes a number or a name, the rewrite is thrown away and the original wording is kept instead." |
+| 2:30 | Compare documents -> "Scanned image" sample -> "Ask AI for a second opinion" | "For cases sent to a human, like this unreadable scan, AI can offer a second opinion. It's advisory only — it can never change the verdict above it." |
+| 2:55 | Outbox tab: toggle hold, press "Process the inbox" | "The Outbox simulates replying to every sender — OK and mismatch replies go out automatically, and anything uncertain is held for a person to check. No real email is ever sent; that's simulated on purpose." |
+| 3:20 | Playground tab: pick "Everything matches", press "Weight" or "Name typo" | "The Playground lets you break a document on purpose — change a weight, a name, a port — and watch the real decision engine react instantly. This is the same engine deciding, live." |
+| 3:45 | Sidebar: point at reader toggle / theme switch | "It works with no AI key at all, using a free rule-based reader that scores a perfect 1.0000 on the organizer's scorer. AI reading is optional, and off by default so it never spends API credit without asking." |
+| 4:05 | Roadmap slide or just the app | "Next we'd add more document types, more fields, and a real mailbox connection. Thanks for watching." |
 
-Record with any screen recorder, upload to YouTube as **Unlisted** or Public
-(not Private), and keep it under 5 minutes (1 mark lost per 30 s over).
+Recording tips:
+- Screen-record the live site in a real browser (not the code). Zoom the browser to ~110%
+  so text reads clearly on video.
+- Show both light and dark theme at least once if you have time — it's a design highlight.
+- Record with any screen recorder (Windows: Xbox Game Bar, Win+G), upload to YouTube as
+  **Unlisted** or Public (never Private, judges can't open it), and stay under 5 minutes —
+  the brief says marks are lost for going over.
 
 ## 4. Submission checklist
 
 - [x] Public GitHub repo: https://github.com/isaaclew1102-web/Averis-unemployed-bums
-- [ ] Live deployed app (must open WITHOUT signing in): https://averis-unemployed-bums-yw82lbdvxstupvjeosomwc.streamlit.app/
+- [x] Live deployed app (opens WITHOUT signing in, verified): https://averis-unemployed-bums-yw82lbdvxstupvjeosomwc.streamlit.app/
 - [ ] Demo video (YouTube, unlisted/public, max 5 min): [link]
-- [ ] Slide deck / documentation
-- [ ] Project description (section 1)
-- [ ] `ground_truth.json` NOT in the repo (already in `.gitignore`)
-- [ ] API key NOT in the repo (only in Streamlit Secrets)
+- [x] Slide deck: `docs/DocHarbor_slides.pptx` — open it once and check nothing overflows
+- [x] Project description (section 1)
+- [x] `ground_truth.json` NOT in the repo (in `.gitignore`, confirmed absent)
+- [x] API key NOT in the repo (only in Streamlit Secrets)
+- [ ] Notes for judges — paste into the submission form only, never into this repo
+      (the AI access code goes here; Claude has it and will remind you, but it is
+      deliberately not written down in any tracked file)
