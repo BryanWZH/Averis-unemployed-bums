@@ -152,7 +152,7 @@ access code and "Read documents with AI" actually work on the live site first
 
 | Time | Show | Say |
 |---|---|---|
-| 0:00 | Title slide / app header | "Hi, we're [team name]. This is DocHarbor, a shipping document verification system, for the Averis x Monash Hackathon. Shipping teams manually check a Shipping Instruction against a draft Bill of Lading across seven fields, by eye, hundreds of times a day. One missed typo means an amended Bill of Lading, delays and cost." |
+| 0:00 | Title slide / app header | "Hi, we're Unemployed Bums. This is DocHarbor, a shipping document verification system, for the Averis x Monash Hackathon. Shipping teams manually check a Shipping Instruction against a draft Bill of Lading across seven fields, by eye, hundreds of times a day. One missed typo means an amended Bill of Lading, delays and cost." |
 | 0:20 | Dashboard tab | "DocHarbor sorts every email into one of five categories, and every document comparison gets a clear verdict: OK, MISMATCH with the exact fields named, or NEEDS REVIEW when something can't be trusted." |
 | 0:40 | Sidebar: type the AI access code, toggle "Read documents with AI" ON | "Here's the core of it, working live. This is our AI reader — I'm entering the access code and switching it on now." |
 | 1:00 | Compare documents tab -> a sample, with AI reading ON, watch it actually read and decide | "Watch this: DocHarbor sends the real document to Claude, which reads it, and this exact field table and verdict come back — read by AI, decided by deterministic code underneath, live, not a script." |
