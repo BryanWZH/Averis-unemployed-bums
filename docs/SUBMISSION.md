@@ -135,7 +135,7 @@ that, not the finished product.
    explicitly as "if we advance, here's the extension," per the brief's
    requirement that the Final Round build on the Preliminary one.
 
-## 3. Demo video script (target 4:20, hard limit 5:00)
+## 3. Demo video script (target 4:40, hard limit 5:00)
 
 **Priority order:** (1) AI mode working live on camera — "Working Core
 Prototype" is 25 of 100 points, the single biggest line item, and it means
@@ -154,23 +154,23 @@ averis-unemployed-bums-yw82lbdvxstupvjeosomwc.streamlit.app.
 |---|---|---|
 | 0:00 | **Slide 1 (Title)** | "Hi, we're Unemployed Bums. This is DocHarbor, a shipping document verification system, for the Averis x Monash Hackathon." |
 | 0:12 | Dashboard opening (stat cards, donut, categories) | "Shipping teams manually check a Shipping Instruction against a draft Bill of Lading across seven fields, by eye, hundreds of times a day. One missed typo means an amended Bill of Lading, delays and cost." |
-| 0:30 | Sidebar: type the AI access code, toggle "Read documents with AI" ON | "Here's the core of it, working live — I'm switching on our AI reader now." |
-| 0:45 | Badge changes to "AI reader on"; Compare Documents tab, run "Everything matches" | "Watch this: DocHarbor sends the document to Claude, which reads it, and this exact field table and verdict come back — live, not a script." |
-| 1:10 | Point at the caption under the verdict: "Read with AI (Claude) — the fields below came from the AI reader; the verdict above still comes from plain code" | "That line is the proof. It only says that when AI actually did the reading — the verdict itself never comes from the model." |
-| 1:25 | Open the Audit trail expander | "Every field's decision is auditable: the value as read, the normalised value, and the exact rule that made the call. A language model never gets a vote on whether a discrepancy is real." |
-| 1:45 | Click "Open in my email app" — a real Outlook draft opens, pre-filled | "This isn't a mockup — it hands off to your actual email client with the reply already drafted." |
-| 2:00 | "Scanned image" sample -> NEEDS REVIEW, Why / Next step shown | "It doesn't guess. A scan, a wrong document, a blank field — all escalated with a clear reason." |
-| 2:15 | Click "Ask AI for a second opinion" | "For cases sent to a human, AI can offer a second opinion — advisory only, it can never override the verdict above it." |
-| 2:35 | Talk over Inbox Browser | "We checked this against the organizer's official scorer, then separately against four independently generated datasets to rule out overfitting. It's backed by 26 automated unit tests and 43 real-browser checks." |
-| 2:55 | **Slide 10 (Validation results)** | "Measured for real: a perfect 1.0000 with the AI reader live — 240 Claude calls, 200 out of 200 comparisons decided exactly right, plus all 20 edge cases correctly escalated. The free rule-based reader scores that same perfect 1.0000 with zero API cost — the AI mode is a validated upgrade, not a guess." |
-| 3:20 | Outbox tab: point at "Simulation mode: no email is actually sent" banner, toggle "Hold mismatch replies for approval", press Process | "The Outbox shows exactly what would be sent — nothing really is. Mismatch replies can be held back for a person to approve first." |
-| 3:45 | Playground: edit the Shipper field live, verdict flips to MISMATCH on screen | "Change one letter, and the real decision engine reacts instantly — this is the same engine deciding, live." |
-| 4:05 | **Slide 11 (Roadmap)** | "This is our Preliminary Round entry. For the Final Round, we'd add more document types, more fields, and a real mailbox connection. Thanks for watching." |
+| 0:28 | Quick theme flip: dark → light → back (~3-4 sec) | *(no line — silent flourish)* |
+| 0:32 | Sidebar: type the AI access code, toggle "Read documents with AI" ON | "Here's the core of it, working live — I'm switching on our AI reader now." |
+| 0:47 | Badge changes to "AI reader on"; Compare Documents tab, run "Everything matches" | "Watch this: DocHarbor sends the document to Claude, which reads it, and this exact field table and verdict come back — live, not a script." |
+| 1:12 | Point at the caption under the verdict | "That line is the proof. It only says that when AI actually did the reading — the verdict itself never comes from the model." |
+| 1:27 | Open the Audit trail expander | "Every field's decision is auditable: the value as read, the normalised value, and the exact rule that made the call. A language model never gets a vote on whether a discrepancy is real." |
+| 1:47 | Click "Open in my email app" | "This isn't a mockup — it hands off to your actual email client with the reply already drafted." |
+| 2:02 | "Scanned image" sample -> NEEDS REVIEW | "It doesn't guess. A scan, a wrong document, a blank field — all escalated with a clear reason." |
+| 2:17 | Click "Ask AI for a second opinion" | "For cases sent to a human, AI can offer a second opinion — advisory only, it can never override the verdict above it." |
+| 2:37 | Talk over Inbox Browser | "We checked this against the organizer's official scorer, then separately against four independently generated datasets to rule out overfitting. It's backed by 26 automated unit tests and 43 real-browser checks." |
+| 2:57 | **Slide 10 (Validation results)** | "Measured for real: a perfect 1.0000 with the AI reader live — 240 Claude calls, 200 out of 200 comparisons decided exactly right, plus all 20 edge cases correctly escalated. The free rule-based reader scores that same perfect 1.0000 with zero API cost — the AI mode is a validated upgrade, not a guess. You might ask — if the free reader already scores perfectly, why bother with AI? Because that perfect score is on label variants we already knew about. AI is the part that generalizes to the messy, unpredictable documents we haven't seen yet — which is exactly the challenge the Final Round roadmap is built around." |
+| 3:42 | Outbox tab: "Simulation mode" banner, toggle "Hold mismatch replies for approval" | "The Outbox shows exactly what would be sent — nothing really is. Mismatch replies can be held back for a person to approve first." |
+| 4:07 | Playground: edit the Shipper field live | "Change one letter, and the real decision engine reacts instantly — this is the same engine deciding, live." |
+| 4:27 | **Slide 11 (Roadmap)** | "This is our Preliminary Round entry. For the Final Round, we'd add more document types, more fields, and a real mailbox connection. Thanks for watching." |
 
 Recording tips:
-- Two clips already exist — the long walkthrough and a short theme-toggle
-  clip. Cut the long one down to match the Show column above; the theme clip
-  is optional filler only if time remains under 4:20.
+- The theme flip at 0:28 and the walkthrough are cut from the two clips the
+  team already recorded — trim and splice them to match the Show column above.
 - Zoom the browser to ~110% before recording so on-screen text reads clearly.
 - Upload to YouTube as Unlisted or Public (never Private), stay under 5:00.
 
