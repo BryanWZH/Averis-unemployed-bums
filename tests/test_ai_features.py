@@ -76,6 +76,18 @@ def test_polish_accepts_faithful_rewrite_and_rejects_unfaithful_ones():
     assert not ai_reply.facts_preserved(original, invented, facts)
 
 
+def test_polish_tolerates_cosmetic_reformatting_of_a_number():
+    # A real model very often drops the thousands comma while rewording a number
+    # ("21,577 KG" -> "21577 KG"). That is not a changed fact and must still pass.
+    original = "Hi Sam,\nSI : 21,577 KG\nBL : 21,577.00 KGS"
+    facts = ["21,577 KG", "21,577.00 KGS"]
+    tidied = "Hi Sam,\nThe SI shows 21577 KG while the BL shows 21,577.00 KGS."
+    assert ai_reply.facts_preserved(original, tidied, facts)
+    # but inventing a new number (not present, in any formatting, on either side) must still fail
+    invented = tidied + " We will need this resolved within 24 hours."
+    assert not ai_reply.facts_preserved(original, invented, facts)
+
+
 def _client_returning(text):
     msg = SimpleNamespace(content=[SimpleNamespace(type="text", text=text)])
     return SimpleNamespace(messages=SimpleNamespace(create=lambda **k: msg))

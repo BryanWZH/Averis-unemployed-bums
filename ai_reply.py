@@ -26,15 +26,32 @@ EMAIL:
 _NUM_RE = re.compile(r"\d+")
 
 
+def _norm(s):
+    """Case/whitespace/comma-insensitive form of a string. A real rewrite very
+    often tidies "21,577 KG" into "21577 KG" or collapses double spaces -- that
+    is only formatting, not a changed fact, so the check should not reject it.
+    Commas are dropped outright (not turned into a space) so "21,577" still
+    matches a rewrite that drops the comma without adding one back."""
+    return re.sub(r"\s+", " ", s.strip().lower().replace(",", ""))
+
+
+def _digits(s):
+    """The digit runs in `s`, with thousands-separating commas removed first,
+    so "21,577" and "21577" count as the same number rather than as new digits."""
+    return set(_NUM_RE.findall(s.replace(",", "")))
+
+
 def facts_preserved(original, rewritten, required_values):
-    """True only if every required value appears verbatim and the rewrite
-    introduced no digits that the original did not contain."""
+    """True only if every required value is still recognisably present (allowing
+    case/whitespace/comma differences) and the rewrite introduced no digits that
+    the original did not contain."""
     if not rewritten or not rewritten.strip():
         return False
+    norm_rewritten = _norm(rewritten)
     for v in required_values:
-        if v and v not in rewritten:
+        if v and _norm(v) not in norm_rewritten:
             return False
-    return set(_NUM_RE.findall(rewritten)) <= set(_NUM_RE.findall(original))
+    return _digits(rewritten) <= _digits(original)
 
 
 def polish(body, required_values, client=None):
