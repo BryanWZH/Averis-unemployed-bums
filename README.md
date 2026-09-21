@@ -22,7 +22,6 @@ tell confidently.
 | `samples.py` | The ready-made SI/BL pairs offered in the app |
 | `score_cli.py` | Scores a `submission.json` against a ground-truth file |
 | `packages.txt` | System packages (Tesseract, Poppler) installed on Streamlit Cloud |
-| `docs/` | Project description, slide outline and demo-video script |
 | `sample_submission.json` | The required output shape |
 
 ## Setup
