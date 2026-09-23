@@ -3,3 +3,9 @@ __pycache__/
 .env
 .streamlit/secrets.toml
 ground_truth.json
+.ai_cache/
+submission_ai_only.json
+submission_cross_check.json
+.browser_shots/
+~$*
+docs/

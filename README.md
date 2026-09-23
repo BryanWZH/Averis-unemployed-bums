@@ -1,4 +1,4 @@
-# SDOC Verification Pipeline
+# DocHarbor Verification Pipeline
 
 Reads a shipping-ops inbox, classifies every email, and for document-comparison
 requests, checks a Shipping Instruction (SI) against a draft Bill of Lading (BL)
@@ -16,10 +16,12 @@ tell confidently.
 | `normalize.py` | Shared field-label matching ("Load Port" = "Port of Loading") and value cleanup |
 | `loader.py` | Reads the inbox/attachments from disk (or an HTTP server) |
 | `inbox/`, `attachments/` | The test dataset |
-| `app.py` | Browser demo (Streamlit): upload an SI + BL, or browse the sample inbox |
+| `app.py` | Web app (Streamlit): inbox dashboard, review queue, document comparison with a visual diff, draft replies |
+| `report.py` | Diffs, draft-reply emails, downloadable reports and inbox analytics used by the app |
+| `tests/` | Regression tests (`python tests/test_normalize.py`, `test_report.py`, `test_classify.py`, `test_samples.py`, `test_ai_features.py`) and optional real-browser tests (`browser_check.py`, `browser_features.py`) |
+| `samples.py` | The ready-made SI/BL pairs offered in the app |
 | `score_cli.py` | Scores a `submission.json` against a ground-truth file |
 | `packages.txt` | System packages (Tesseract, Poppler) installed on Streamlit Cloud |
-| `docs/` | Project description, slide outline and demo-video script |
 | `sample_submission.json` | The required output shape |
 
 ## Setup
@@ -51,6 +53,24 @@ python3 pipeline.py . submission.json
 
 This reads every email in `inbox/`, classifies it, and for comparison emails,
 compares the SI against the BL — writing results to `submission.json`.
+
+## Features
+
+- **Dashboard** of the whole inbox: outcomes, most common defects, reasons for escalation, CSV / `submission.json` export
+- **Review queue** of every case that needs a human, with the reason and next step
+- **Visual diff** highlighting the exact characters that differ between SI and BL
+- **Audit trail** per field: value as read, normalised value, rule applied
+- **Draft reply** to the sender, and a downloadable Markdown report per case
+- **Batch mode**: upload many SI/BL files at once, auto-paired by file name
+- **Outbox (simulation)**: after every check DocHarbor drafts the reply to the sender. OK and mismatch replies go out
+  automatically (mismatch replies can be held for approval); anything needing a human is left for a person.
+  Nothing is actually sent, by design.
+- **AI second opinion** on escalated cases (advisory only; the verdict never changes) and optional **AI polish**
+  of reply wording (rejected automatically if the AI changes a value or adds a number)
+- **Ready-made samples** (a match, mismatches in text/PDF/Excel, a blank field, a wrong document, a scan) and a
+  **Playground** where you edit any value and watch the real decision engine react
+- **Time-saved panel** with adjustable assumptions (an estimate, clearly labelled)
+- **Cross-check mode**: the AI and rule-based readers must agree on every field, or the case goes to a human
 
 ## Try it in the browser
 
@@ -86,3 +106,23 @@ endpoint (see the participant bundle's own README for that).
 
 Never commit the API key to GitHub or paste it in chat/Slack. Set it as an
 environment variable only, as shown above.
+
+## Working without spending API credit
+
+AI reading is used only when `ANTHROPIC_API_KEY` is set. To be certain it is
+never used (for example while developing), set `SDOC_NO_AI=1`; the free
+rule-based reader is used even if a key is present:
+
+- PowerShell: `$env:SDOC_NO_AI="1"`
+- Mac/Linux: `export SDOC_NO_AI=1`
+
+## Measuring the AI reader (one paid run)
+
+```
+python evaluate_ai.py . --truth path/to/ground_truth.json
+```
+
+Reads each document with the AI once (saved to `.ai_cache/`, so reruns are free) and reports, for both
+"AI reads, code decides" and "AI + rule-based cross-check": decisions right, defects caught, false alarms and
+false escalations. It writes `submission_ai_only.json` and `submission_cross_check.json` for the scorer.
+Use `--limit 30` for a cheap trial first. Without a key it refuses to run and spends nothing.

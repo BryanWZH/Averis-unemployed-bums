@@ -7,6 +7,7 @@ values so the comparator isn't fooled by formatting differences (commas in
 weights, a trailing "(CODE)" on a port, "6 x 40'HC" vs "6", etc).
 """
 import re
+from decimal import Decimal, InvalidOperation
 
 # Canonical field -> every label string we've seen used for it (SI or BL,
 # any file format). Matching is case-insensitive and tolerant of a trailing
@@ -15,6 +16,7 @@ import re
 LABEL_ALIASES = {
     "shipper": [
         "shipper", "shipper/exporter", "shipper (principal or seller)",
+        "exporter", "seller",
     ],
     "consignee": [
         "consignee", "consignee (non-negotiable)", "to the order of",
@@ -63,42 +65,58 @@ BLANK_PATTERNS = [
 ]
 
 
-def clean_label(raw_label):
+def clean_label(raw_label, strip_total=True):
     """Strip a trailing parenthetical / CJK gloss, punctuation, and case
     so 'Shipper (发货人)' or 'SHIPPER' both become 'shipper'."""
     s = raw_label.strip()
-    # drop a leading "TOTAL " (used once, on the PDF gross-weight line)
-    s = re.sub(r"^total\s+", "", s, flags=re.I)
-    # drop any parenthetical suffix, e.g. "(发货人)", "(POL)" is meaningful
-    # only when it's the WHOLE label carrying no other text before it --
-    # but "Port of Loading (POL)" is itself a known alias, so only strip
-    # parens that contain non-ASCII (CJK glosses) or look like a gloss tail
-    # appended by the docx renderer.
-    s = re.sub(r"\s*\([^)]*[^\x00-\x7F][^)]*\)\s*$", "", s)  # trailing CJK paren
+    # a leading "TOTAL " is dropped ("TOTAL Gross Weight"), but callers also
+    # try the label with it kept because "Total Containers" is an alias.
+    if strip_total:
+        s = re.sub(r"^total\s+", "", s, flags=re.I)
+    # drop a trailing parenthetical that holds non-ASCII text (CJK glosses
+    # appended by the docx renderer); "(POL)" is meaningful, so it stays.
+    s = re.sub(r"\s*\([^)]*[^\x00-\x7F][^)]*\)\s*$", "", s)
     s = s.strip().rstrip(":").strip()
     return s.lower()
 
 
+def _squash(text):
+    return re.sub(r"[^a-z0-9]+", " ", text).strip()
+
+
+_SQUASHED_LOOKUP = {_squash(k): f for k, f in _LOOKUP.items()}
+# Short aliases (POL, POD) are too easy to hit by accident for prefix matching.
+_PREFIX_ALIASES = sorted((a for a in _LOOKUP if len(a) >= 4), key=len, reverse=True)
+_LABEL_TAIL_RE = re.compile(r"[a-z]{0,3}\s?\([^)]*\)")
+
+
 def field_for_label(raw_label):
-    """Return the canonical field name for a raw label string, or None."""
+    """Return the canonical field name for a raw label string, or None.
+
+    Matching is exact after cleaning (case, punctuation, a leading TOTAL,
+    a trailing CJK gloss, CJK characters glued onto the label). Substring
+    matching is deliberately NOT used: it maps unrelated labels such as
+    "Shipper Reference" or "Consignee Tel" onto real fields, and the first
+    hit wins, so that would silently corrupt the extracted value."""
     if raw_label is None:
         return None
-    key = clean_label(raw_label)
-    if key in _LOOKUP:
-        return _LOOKUP[key]
-    # loose fallback 1: punctuation-normalised
-    key2 = re.sub(r"[^a-z0-9]+", " ", key).strip()
-    if key2 in _LOOKUP:
-        return _LOOKUP[key2]
-    for alias_key, field in _LOOKUP.items():
-        alias2 = re.sub(r"[^a-z0-9]+", " ", alias_key).strip()
-        if alias2 and alias2 == key2:
-            return field
-    # loose fallback 2: substring containment either way (catches odd
-    # concatenations we haven't anticipated, e.g. embedded CJK glosses)
-    for alias_key, field in _LOOKUP.items():
-        if len(alias_key) >= 4 and (alias_key in key or key in alias_key):
-            return field
+    for strip_total in (False, True):
+        key = clean_label(raw_label, strip_total)
+        if key in _LOOKUP:
+            return _LOOKUP[key]
+        squashed = _squash(key)
+        if squashed in _SQUASHED_LOOKUP:
+            return _SQUASHED_LOOKUP[squashed]
+        # CJK text glued straight onto the label, e.g. "gross weight毛重(kgs)"
+        ascii_only = _squash(re.sub(r"[^\x00-\x7F]+", " ", key))
+        if ascii_only in _SQUASHED_LOOKUP:
+            return _SQUASHED_LOOKUP[ascii_only]
+        # A known label followed only by a parenthesised unit/gloss, allowing
+        # a few stray glyphs before it: PDF extraction can print
+        # "Gross Weightnn(KGS)" when label and value columns overlap.
+        for alias in _PREFIX_ALIASES:
+            if key.startswith(alias) and _LABEL_TAIL_RE.fullmatch(key[len(alias):]):
+                return _LOOKUP[alias]
     return None
 
 
@@ -168,11 +186,63 @@ def normalize_value(field, raw_value):
         return v or None
 
     if field == "container_count":
-        m = re.search(r"\d+", v)
-        return m.group(0) if m else None
+        return _container_count(v)
 
     if field == "gross_weight_kg":
-        digits = re.sub(r"[^\d]", "", v)
-        return digits if digits else None
+        return _weight_kg(v)
 
     return v
+
+
+def _container_count(v):
+    """'3 x 40'HC' -> '3', "40'HC x 3" -> '3', '03 CONTAINERS' -> '3'."""
+    for pat in (r"^\s*(\d+)\s*[xX×]",                        # "3 x 40'HC"
+                r"\d+\s*['’]?\s*[A-Za-z]{0,3}\s*[xX×]\s*(\d+)\b",  # "40'HC x 3"
+                r"(\d+)"):
+        m = re.search(pat, v)
+        if m:
+            return str(int(m.group(1)))
+    return None
+
+
+_TONNE_RE = re.compile(r"\b(mts?|tonnes?|tons?|t)\b", re.I)
+_LB_RE = re.compile(r"\b(lbs?|pounds?)\b", re.I)
+
+
+def _weight_kg(v):
+    """Parse a printed weight into kilograms as a canonical string, so
+    '61,026 KG', '61,026.00 KGS', '61.026,00' and '61.026 MT' all agree."""
+    m = re.search(r"\d[\d.,\s]*", v)
+    if not m:
+        return None
+    num = m.group(0).strip().replace(" ", "")
+    tonnes = bool(_TONNE_RE.search(v))
+    dots, commas = num.count("."), num.count(",")
+    if dots and commas:
+        dec = "." if num.rfind(".") > num.rfind(",") else ","
+    elif dots > 1 or commas > 1:
+        dec = None                                   # only thousands separators
+    elif dots or commas:
+        sep = "." if dots else ","
+        tail = num.split(sep)[1]
+        # one separator + exactly 3 digits is thousands ("61,026") unless
+        # the unit is tonnes, where "61.026 MT" is a decimal.
+        dec = sep if (len(tail) != 3 or tonnes) else None
+    else:
+        dec = None
+    if dec:
+        int_part, _, frac = num.rpartition(dec)
+        int_part = re.sub(r"[.,]", "", int_part)
+        num = f"{int_part or '0'}.{frac}"
+    else:
+        num = re.sub(r"[.,]", "", num)
+    try:
+        val = Decimal(num)
+    except InvalidOperation:
+        return None
+    if tonnes:
+        val *= 1000
+    elif _LB_RE.search(v):
+        val *= Decimal("0.45359237")
+    val = val.quantize(Decimal("0.001")).normalize()
+    return format(val, "f")

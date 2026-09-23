@@ -589,13 +589,10 @@
   },
   "email_082": {
     "category": "BL_COMPARISON",
-    "status": "MISMATCH",
+    "status": "OK",
     "review_reason": null,
-    "has_defect": true,
-    "defect_fields": [
-      "port_of_discharge",
-      "port_of_loading"
-    ]
+    "has_defect": false,
+    "defect_fields": []
   },
   "email_083": {
     "category": "GENERAL",
@@ -2220,13 +2217,10 @@
   },
   "email_307": {
     "category": "BL_COMPARISON",
-    "status": "MISMATCH",
+    "status": "OK",
     "review_reason": null,
-    "has_defect": true,
-    "defect_fields": [
-      "port_of_discharge",
-      "port_of_loading"
-    ]
+    "has_defect": false,
+    "defect_fields": []
   },
   "email_308": {
     "category": "SI_REQUEST",
@@ -2426,7 +2420,6 @@
     "has_defect": true,
     "defect_fields": [
       "consignee",
-      "port_of_discharge",
       "shipper"
     ]
   },
@@ -2964,12 +2957,10 @@
   },
   "email_409": {
     "category": "BL_COMPARISON",
-    "status": "MISMATCH",
+    "status": "OK",
     "review_reason": null,
-    "has_defect": true,
-    "defect_fields": [
-      "port_of_discharge"
-    ]
+    "has_defect": false,
+    "defect_fields": []
   },
   "email_410": {
     "category": "BL_COMPARISON",
@@ -3395,7 +3386,6 @@
     "has_defect": true,
     "defect_fields": [
       "container_count",
-      "port_of_discharge",
       "port_of_loading"
     ]
   },
@@ -3706,32 +3696,24 @@
   },
   "email_512": {
     "category": "BL_COMPARISON",
-    "status": "MISMATCH",
-    "review_reason": null,
-    "has_defect": true,
-    "defect_fields": [
-      "consignee",
-      "notify_party"
-    ]
+    "status": "NEEDS_REVIEW",
+    "review_reason": "unreadable",
+    "has_defect": false,
+    "defect_fields": []
   },
   "email_513": {
     "category": "BL_COMPARISON",
-    "status": "MISMATCH",
-    "review_reason": null,
-    "has_defect": true,
-    "defect_fields": [
-      "consignee"
-    ]
+    "status": "NEEDS_REVIEW",
+    "review_reason": "unreadable",
+    "has_defect": false,
+    "defect_fields": []
   },
   "email_514": {
     "category": "BL_COMPARISON",
-    "status": "MISMATCH",
-    "review_reason": null,
-    "has_defect": true,
-    "defect_fields": [
-      "port_of_discharge",
-      "port_of_loading"
-    ]
+    "status": "NEEDS_REVIEW",
+    "review_reason": "unreadable",
+    "has_defect": false,
+    "defect_fields": []
   },
   "email_515": {
     "category": "BL_COMPARISON",

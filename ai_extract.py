@@ -68,6 +68,10 @@ def _get_key():
     """Read the key and strip stray whitespace -- a trailing space or
     newline from a copy-paste is an easy, invisible mistake, and HTTP
     flatly rejects a header value that has one."""
+    # Hard off-switch: SDOC_NO_AI=1 forces the free rule-based reader even if
+    # a key is present, so building and testing can never spend API credit.
+    if os.environ.get("SDOC_NO_AI", "").strip().lower() in ("1", "true", "yes"):
+        return None
     key = os.environ.get("ANTHROPIC_API_KEY")
     return key.strip() if key else None
 
@@ -135,6 +139,8 @@ def ai_extract(data: bytes, filename: str) -> ExtractResult:
         res.readable = False
         res.unreadable_reason = "no_api_key_configured"
         return res
+
+    res.source = "ai"   # past this point, this result is the AI reader's own attempt (success or not)
 
     try:
         blocks = _content_block_for(data, filename)
